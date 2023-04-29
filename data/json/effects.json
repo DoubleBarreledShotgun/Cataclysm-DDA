@@ -1713,6 +1713,7 @@
     "desc": [ "The sunlight is reflecting off the snow." ],
     "apply_message": "The sunlight reflecting off the snow makes it hard to see.",
     "rating": "bad",
+    "max_duration": "1 m",
     "base_mods": { "per_mod": [ -1 ] },
     "limb_score_mods": [
       { "limb_score": "vision", "modifier": 0.5 },
