@@ -129,7 +129,7 @@
     "id": "MISSION_PrepNet_gardener_FUR_1",
     "type": "mission_definition",
     "name": "Big Game Hunting",
-    "description": "Find 50 fur pelts.",
+    "description": "Find 50 fur patches.",
     "goal": "MGOAL_FIND_ITEM",
     "difficulty": 1,
     "value": 0,
@@ -138,7 +138,7 @@
     "origins": [ "ORIGIN_SECONDARY" ],
     "followup": "MISSION_PrepNet_gardener_FOOD_2",
     "dialogue": {
-      "describe": "I need 50 fur pelts.",
+      "describe": "I need 50 fur patches.",
       "offer": "I've got to maintain the orchard but at nights I work on prepping winter clothes.  Could you find about… 50 fur pelts for me?",
       "accepted": "Don't forget to tell me when you have them.",
       "rejected": "It's okay, I can do without them.  Just let me know if you reconsider.",
