@@ -195,7 +195,7 @@
     "type": "COMESTIBLE",
     "id": "bread_wheat_free",
     "name": { "str_sp": "wheat-free bread" },
-    "description": "A piece of bread made from wheat-free flour, one of the single most important staple foods of human civilization since the discovery of glucose intolerance.",
+    "description": "A piece of bread made from wheat-free flour, one of the single most important staple foods of human civilization since the discovery of gluten intolerance.",
     "material": [ "veggy" ],
     "looks_like": "bread",
     "weight": "56 g",
