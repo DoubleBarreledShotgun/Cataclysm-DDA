@@ -1,20 +1,27 @@
-#include <iosfwd>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "avatar.h"
 #include "cata_catch.h"
+#include "coordinates.h"
+#include "creature.h"
 #include "creature_tracker.h"
+#include "dialogue_helpers.h"
 #include "game.h"
 #include "magic.h"
+#include "magic_type.h"
+#include "map.h"
 #include "map_helpers.h"
 #include "monster.h"
+#include "npc.h"
 #include "pimpl.h"
 #include "player_helpers.h"
 #include "point.h"
 #include "type_id.h"
 
 static const spell_id spell_test_spell_box( "test_spell_box" );
+static const spell_id spell_test_spell_tp_ghost( "test_spell_tp_ghost" );
 static const spell_id spell_test_spell_tp_mummy( "test_spell_tp_mummy" );
 
 // Magic Spell tests
@@ -22,7 +29,7 @@ static const spell_id spell_test_spell_tp_mummy( "test_spell_tp_mummy" );
 //
 // Each test case relates to some spell feature, in terms of:
 //
-// - JSON spell content, from data/json/*.json, as documented in doc/MAGIC.md
+// - JSON spell content, from data/json/*.json, as documented in doc/JSON/MAGIC.md
 // - C++ spell functions, defined in src/magic.cpp and src/magic_spell_effect.cpp
 //
 // To run all tests in this file:
@@ -43,7 +50,7 @@ static const spell_id spell_test_spell_tp_mummy( "test_spell_tp_mummy" );
 // Functions:
 // spell::name
 //
-TEST_CASE( "spell name", "[magic][spell][name]" )
+TEST_CASE( "spell_name", "[magic][spell][name]" )
 {
     // Test spells from data/mods/TEST_DATA/magic.json
     spell_id pew_id( "test_spell_pew" );
@@ -73,7 +80,7 @@ TEST_CASE( "spell name", "[magic][spell][name]" )
 // spell::set_level
 // spell::exp_to_next_level
 
-TEST_CASE( "spell level", "[magic][spell][level]" )
+TEST_CASE( "spell_level", "[magic][spell][level]" )
 {
     npc guy;
     spell_id pew_id( "test_spell_pew" );
@@ -117,7 +124,7 @@ static int spell_xp_to_next_level( const spell_id &sp_id, const int from_level )
     return test_spell.exp_to_next_level();
 }
 
-TEST_CASE( "experience to gain spell levels", "[magic][spell][level][xp]" )
+TEST_CASE( "experience_to_gain_spell_levels", "[magic][spell][level][xp]" )
 {
     npc guy;
     spell_id pew_id( "test_spell_pew" );
@@ -243,7 +250,7 @@ static int spell_damage( const spell_id &sp_id, const int spell_level )
     return test_spell.damage( guy );
 }
 
-TEST_CASE( "spell damage", "[magic][spell][damage]" )
+TEST_CASE( "spell_damage", "[magic][spell][damage]" )
 {
     spell_id pew_id( "test_spell_pew" );
     const spell_type &pew_type = pew_id.obj();
@@ -296,7 +303,7 @@ static std::string spell_duration_string( const spell_id &sp_id, const int spell
     return test_spell.duration_string( guy );
 }
 
-TEST_CASE( "spell duration", "[magic][spell][duration]" )
+TEST_CASE( "spell_duration", "[magic][spell][duration]" )
 {
     spell_id lava_id( "test_spell_lava" );
     const spell_type &lava_type = lava_id.obj();
@@ -346,7 +353,7 @@ TEST_CASE( "spell duration", "[magic][spell][duration]" )
 // Spells with the PERMANENT flag have behavior that depends on what kind of spell it is
 // - If spell has "effect": "spawn_item", the spawned item only has permanent duration at maximum level
 // - If spell has "effect": "summon", the summoned monster can have permanent duration at any level
-TEST_CASE( "permanent spell duration depends on effect and level", "[magic][spell][permanent]" )
+TEST_CASE( "permanent_spell_duration_depends_on_effect_and_level", "[magic][spell][permanent]" )
 {
     npc guy;
     GIVEN( "spell with spawn_item effect, nonzero duration, and PERMANENT flag" ) {
@@ -418,7 +425,7 @@ static int spell_range( const spell_id &sp_id, const int spell_level )
     return test_spell.range( guy );
 }
 
-TEST_CASE( "spell range", "[magic][spell][range]" )
+TEST_CASE( "spell_range", "[magic][spell][range]" )
 {
     spell_id pew_id( "test_spell_pew" );
     const spell_type &pew_type = pew_id.obj();
@@ -473,7 +480,7 @@ static int spell_aoe( const spell_id &sp_id, const int spell_level )
     return test_spell.aoe( guy );
 }
 
-TEST_CASE( "spell area of effect", "[magic][spell][aoe]" )
+TEST_CASE( "spell_area_of_effect", "[magic][spell][aoe]" )
 {
     spell_id lava_id( "test_spell_lava" );
     const spell_type &lava_type = lava_id.obj();
@@ -524,14 +531,15 @@ TEST_CASE( "spell area of effect", "[magic][spell][aoe]" )
 // spell_effect::cone_attack
 
 // spell_effect::target_attack
-TEST_CASE( "spell effect - target_attack", "[magic][spell][effect][target_attack]" )
+TEST_CASE( "spell_effect_-_target_attack", "[magic][spell][effect][target_attack]" )
 {
     // World setup
+    map &here = get_map();
     clear_map();
 
     // Locations for avatar and monster
-    const tripoint dummy_loc = { 60, 60, 0 };
-    const tripoint mummy_loc = { 62, 60, 0 };
+    const tripoint_bub_ms dummy_loc = { 60, 60, 0 };
+    const tripoint_bub_ms mummy_loc = { 62, 60, 0 };
 
     // For tracking spell damage
     int before_hp = 0;
@@ -541,14 +549,14 @@ TEST_CASE( "spell effect - target_attack", "[magic][spell][effect][target_attack
     // Avatar/spellcaster
     avatar &dummy = get_avatar();
     clear_character( dummy );
-    dummy.setpos( dummy_loc );
-    REQUIRE( dummy.pos() == dummy_loc );
+    dummy.setpos( here, dummy_loc );
+    REQUIRE( dummy.pos_bub() == dummy_loc );
     REQUIRE( creatures.creature_at( dummy_loc ) );
     REQUIRE( g->num_creatures() == 1 );
 
     // Monster/defender
     monster &mummy = spawn_test_monster( "mon_zombie", mummy_loc );
-    REQUIRE( mummy.pos() == mummy_loc );
+    REQUIRE( mummy.pos_bub() == mummy_loc );
     REQUIRE( creatures.creature_at( mummy_loc ) );
     REQUIRE( g->num_creatures() == 2 );
 
@@ -580,21 +588,39 @@ TEST_CASE( "spell effect - target_attack", "[magic][spell][effect][target_attack
 }
 
 // spell_effect::spawn_summoned_monster
-TEST_CASE( "spell effect - summon", "[magic][spell][effect][summon]" )
+TEST_CASE( "spell_effect_-_summon", "[magic][spell][effect][summon]" )
 {
+    map &here = get_map();
+
     clear_map();
 
     // Avatar/spellcaster and summoned mummy locations
-    const tripoint dummy_loc = { 60, 60, 0 };
-    const tripoint mummy_loc = { 61, 60, 0 };
+    const tripoint_bub_ms dummy_loc = { 60, 60, 0 };
+    const tripoint_bub_ms mummy_loc = { 61, 60, 0 };
 
     avatar &dummy = get_avatar();
     creature_tracker &creatures = get_creature_tracker();
     clear_character( dummy );
-    dummy.setpos( dummy_loc );
-    REQUIRE( dummy.pos() == dummy_loc );
+    dummy.setpos( here, dummy_loc );
+    REQUIRE( dummy.pos_bub() == dummy_loc );
     REQUIRE( creatures.creature_at( dummy_loc ) );
     REQUIRE( g->num_creatures() == 1 );
+
+    spell ghost_spell( spell_test_spell_tp_ghost );
+    REQUIRE( dummy.magic->has_enough_energy( dummy, ghost_spell ) );
+
+    // Summon the ghost in the adjacent space
+    ghost_spell.cast_spell_effect( dummy, mummy_loc );
+
+    CHECK( creatures.creature_at( mummy_loc ) );
+    CHECK( g->num_creatures() == 2 );
+
+    //kill the ghost
+    creatures.creature_at( mummy_loc )->die( &here, nullptr );
+    g->cleanup_dead();
+
+    //a corpse was not created
+    CHECK( get_map().i_at( mummy_loc ).empty() );
 
     spell_id mummy_id( "test_spell_tp_mummy" );
 
@@ -606,10 +632,18 @@ TEST_CASE( "spell effect - summon", "[magic][spell][effect][summon]" )
 
     CHECK( creatures.creature_at( mummy_loc ) );
     CHECK( g->num_creatures() == 2 );
+
+    //kill the mummy
+    creatures.creature_at( mummy_loc )->die( &here, nullptr );
+    g->cleanup_dead();
+
+    //a corpse was created
+    CHECK( !get_map().i_at( mummy_loc ).empty() );
+
 }
 
 // spell_effect::recover_energy
-TEST_CASE( "spell effect - recover_energy", "[magic][spell][effect][recover_energy]" )
+TEST_CASE( "spell_effect_-_recover_energy", "[magic][spell][effect][recover_energy]" )
 {
     // Takes recovery amount from sp.damage
     // Takes energy source from sp.effect_data
@@ -621,7 +655,7 @@ TEST_CASE( "spell effect - recover_energy", "[magic][spell][effect][recover_ener
     // BIONIC: p.mod_power_level (positive) OR p.mod_stamina (negative)
     //
     // For these effects, negative "damage" is good (reducing the amount of a bad thing)
-    // FATIGUE: p.mod_fatigue
+    // sleepiness: p.mod_sleepiness
     // PAIN: p.mod_pain_resist or p_mod_pain
 
     // NOTE: This spell effect cannot be used for healing HP.
@@ -641,7 +675,7 @@ TEST_CASE( "spell effect - recover_energy", "[magic][spell][effect][recover_ener
         REQUIRE( montage_type.effect_str == "STAMINA" );
         // at the cost of a substantial amount of mana
         REQUIRE( montage_type.base_energy_cost.min.dbl_val.value() == 800 );
-        REQUIRE( montage_type.energy_source == magic_energy_type::mana );
+        REQUIRE( montage_type.get_energy_source() == magic_energy_type::mana );
 
         // At level 0, recovers 1000 stamina (10% of maximum)
         REQUIRE( montage_type.min_damage.min.dbl_val.value() == 1000 );
@@ -655,7 +689,7 @@ TEST_CASE( "spell effect - recover_energy", "[magic][spell][effect][recover_ener
 
         // Cast montage spell on avatar
         spell montage_spell( montage_id );
-        montage_spell.cast_spell_effect( dummy, dummy.pos() );
+        montage_spell.cast_spell_effect( dummy, dummy.pos_bub() );
 
         // Get stamina back equal to min_damage (at level 0)
         CHECK( dummy.get_stamina() == start_stamina + montage_type.min_damage.min.dbl_val.value() );
@@ -677,13 +711,13 @@ TEST_CASE( "spell effect - recover_energy", "[magic][spell][effect][recover_ener
         dummy.set_pain( 5 );
         REQUIRE( dummy.get_pain() == 5 );
 
-        kiss_spell.cast_spell_effect( dummy, dummy.pos() );
+        kiss_spell.cast_spell_effect( dummy, dummy.pos_bub() );
         CHECK( dummy.get_pain() == 4 );
 
-        kiss_spell.cast_spell_effect( dummy, dummy.pos() );
+        kiss_spell.cast_spell_effect( dummy, dummy.pos_bub() );
         CHECK( dummy.get_pain() == 3 );
 
-        kiss_spell.cast_spell_effect( dummy, dummy.pos() );
+        kiss_spell.cast_spell_effect( dummy, dummy.pos_bub() );
         CHECK( dummy.get_pain() == 2 );
     }
 }

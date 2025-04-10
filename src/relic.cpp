@@ -1,23 +1,22 @@
 #include "relic.h"
 
 #include <algorithm>
-#include <cmath>
 #include <cstdlib>
-#include <set>
 #include <string>
 
 #include "calendar.h"
 #include "character.h"
 #include "creature.h"
 #include "debug.h"
+#include "enum_conversions.h"
 #include "enums.h"
+#include "flexbuffer_json.h"
 #include "generic_factory.h"
 #include "json.h"
 #include "magic.h"
 #include "magic_enchantment.h"
 #include "map.h"
 #include "rng.h"
-#include "string_id.h"
 #include "translations.h"
 #include "type_id.h"
 #include "weather.h"
@@ -105,6 +104,8 @@ void relic_procgen_data::load_relic_procgen_data( const JsonObject &jo, const st
 {
     relic_procgen_data_factory.load( jo, src );
 }
+
+relic::~relic() = default;
 
 void relic::add_active_effect( const fake_spell &sp )
 {
@@ -331,7 +332,7 @@ void relic_charge_info::accumulate_charge( item &parent )
             if( current_ammo == itype_id::NULL_ID() ) {
                 current_magazine->ammo_set( current_magazine->ammo_default(), 1 );
             } else {
-                current_magazine->ammo_set( current_ammo, current_magazine->ammo_remaining() + 1 );
+                current_magazine->ammo_set( current_ammo, current_magazine->ammo_remaining( ) + 1 );
             }
         } else {
             charges++;
@@ -413,13 +414,13 @@ void relic::serialize( JsonOut &jsout ) const
     jsout.end_object();
 }
 
-int relic::activate( Creature &caster, const tripoint &target )
+int relic::activate( Creature &caster, const tripoint_bub_ms &target )
 {
     if( charge.charges_per_use != 0 && charges() - charge.charges_per_use < 0 ) {
         caster.add_msg_if_player( m_bad, _( "This artifact lacks the charges to activate." ) );
         return 0;
     }
-    caster.moves -= moves;
+    caster.mod_moves( -moves );
     for( const fake_spell &sp : active_effects ) {
         spell casting = sp.get_spell( caster, sp.level );
         casting.cast_all_effects( caster, target );
@@ -451,7 +452,7 @@ bool relic::has_recharge() const
 
 // checks if the relic is in the appropriate location to be able to recharge from the weather.
 // does not check the weather type, that job is relegated to the switch in relic::try_recharge()
-static bool can_recharge_solar( const item &it, Character *carrier, const tripoint &pos )
+static bool can_recharge_solar( const item &it, Character *carrier, const tripoint_bub_ms &pos )
 {
     return get_map().is_outside( pos ) && is_day( calendar::turn ) &&
            ( carrier == nullptr ||
@@ -460,14 +461,14 @@ static bool can_recharge_solar( const item &it, Character *carrier, const tripoi
 
 // checks if the relic is in the appropriate location to be able to recharge from the weather.
 // does not check the weather type, that job is relegated to the switch in relic::try_recharge()
-static bool can_recharge_lunar( const item &it, Character *carrier, const tripoint &pos )
+static bool can_recharge_lunar( const item &it, Character *carrier, const tripoint_bub_ms &pos )
 {
     return get_map().is_outside( pos ) && is_night( calendar::turn ) &&
            ( carrier == nullptr ||
              carrier->is_worn( it ) || carrier->is_wielding( it ) );
 }
 
-void relic::try_recharge( item &parent, Character *carrier, const tripoint &pos )
+void relic::try_recharge( item &parent, Character *carrier, const tripoint_bub_ms &pos )
 {
     if( charge.regenerate_ammo && item_can_not_load_ammo( parent ) ) {
         return;
@@ -710,7 +711,7 @@ relic relic_procgen_data::generate( const relic_procgen_data::generation_rules &
                     passive_mult_procgen_values.pick();
                 if( mult != nullptr ) {
                     enchant_cache ench;
-                    float value = rng( mult->min_value, mult->max_value );
+                    float value = rng_float( mult->min_value, mult->max_value );
                     ench.add_value_mult( mult->type, value );
                     int negative_ench_attribute = power_level( ench );
                     if( negative_ench_attribute < 0 ) {

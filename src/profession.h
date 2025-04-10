@@ -2,27 +2,27 @@
 #ifndef CATA_SRC_PROFESSION_H
 #define CATA_SRC_PROFESSION_H
 
-#include <iosfwd>
 #include <list>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
+#include "addiction.h"
+#include "mutation.h"
 #include "ret_val.h"
-#include "translations.h"
+#include "translation.h"
 #include "type_id.h"
 
+class Character;
 class JsonObject;
-class addiction;
 class avatar;
 class item;
-class Character;
 template<typename T>
 class generic_factory;
-
-struct trait_and_var;
 
 class profession
 {
@@ -47,7 +47,6 @@ class profession
 
     private:
         string_id<profession> id;
-        std::vector<std::pair<string_id<profession>, mod_id>> src;
         bool was_loaded = false;
 
         translation _name_male;
@@ -55,6 +54,7 @@ class profession
         translation _description_male;
         translation _description_female;
         signed int _point_cost = 0;
+        std::optional<signed int> _starting_cash = std::nullopt;
 
         // TODO: In professions.json, replace lists of itypes (legacy) with item groups
         itypedecvec legacy_starting_items;
@@ -71,12 +71,19 @@ class profession
         std::vector<addiction> _starting_addictions;
         std::vector<bionic_id> _starting_CBMs;
         std::vector<proficiency_id> _starting_proficiencies;
+        std::vector<recipe_id> _starting_recipes;
         std::vector<trait_and_var> _starting_traits;
+        std::vector<matype_id> _starting_martialarts;
+        std::vector<matype_id> _starting_martialarts_choices;
         std::set<trait_id> _forbidden_traits;
         std::vector<mtype_id> _starting_pets;
+        trait_group::Trait_group_tag _starting_npc_background;
+        std::set<string_id<profession>> _hobby_exclusion;
+        bool hobbies_whitelist = true;
         vproto_id _starting_vehicle = vproto_id::NULL_ID();
         // the int is what level the spell starts at
         std::map<spell_id, int> _starting_spells;
+        std::vector<effect_on_condition_id> effect_on_conditions;
         std::set<std::string> flags; // flags for some special properties of the profession
         StartingSkillList  _starting_skills;
         std::vector<mission_type_id> _missions; // starting missions for profession
@@ -111,19 +118,32 @@ class profession
         std::string gender_appropriate_name( bool male ) const;
         std::string description( bool male ) const;
         signed int point_cost() const;
+        std::optional<signed int> starting_cash() const;
         std::list<item> items( bool male, const std::vector<trait_id> &traits ) const;
         std::vector<addiction> addictions() const;
         vproto_id vehicle() const;
         std::vector<mtype_id> pets() const;
         std::vector<bionic_id> CBMs() const;
         std::vector<proficiency_id> proficiencies() const;
+        std::vector<recipe_id> recipes() const;
+        std::vector<matype_id> ma_known() const;
+        std::vector<matype_id> ma_choices() const;
+        bool allows_hobby( const string_id<profession> &hobby )const;
+        int ma_choice_amount;
         StartingSkillList skills() const;
         const std::vector<mission_type_id> &missions() const;
+        int age_lower = 21;
+        int age_upper = 55;
+
+        std::vector<std::pair<string_id<profession>, mod_id>> src;
 
         std::optional<achievement_id> get_requirement() const;
 
         std::map<spell_id, int> spells() const;
         void learn_spells( avatar &you ) const;
+        std::vector<effect_on_condition_id> get_eocs() const;
+        //returns the profession id
+        profession_id get_profession_id() const;
 
         /**
          * Check if this type of profession has a certain flag set.
@@ -148,8 +168,20 @@ class profession
         bool is_forbidden_trait( const trait_id &trait ) const;
         std::vector<trait_and_var> get_locked_traits() const;
         std::set<trait_id> get_forbidden_traits() const;
+        trait_id pick_background() const;
 
         bool is_hobby() const;
+        bool is_blacklisted() const;
+};
+
+struct profession_blacklist {
+    std::set<string_id<profession>> professions;
+    bool whitelist = false;
+
+    static void load_profession_blacklist( const JsonObject &jo, std::string_view src );
+    static void reset();
+    void load( const JsonObject &jo, std::string_view );
+    void check_consistency() const;
 };
 
 #endif // CATA_SRC_PROFESSION_H

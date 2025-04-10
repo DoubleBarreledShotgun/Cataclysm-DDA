@@ -2,14 +2,15 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <set>
 #include <string>
+#include <unordered_map>
 
 #include "assign.h"
 #include "debug.h"
+#include "flexbuffer_json.h"
 #include "game_constants.h"
 #include "generic_factory.h"
-#include "json.h"
+#include "translations.h"
 
 static std::vector<move_mode_id> move_modes_sorted;
 
@@ -183,7 +184,7 @@ float move_mode::move_speed_mult() const
 
 units::energy move_mode::mech_power_use() const
 {
-    return units::from_kilojoule( _mech_power_use );
+    return units::from_kilojoule( static_cast<std::int64_t>( _mech_power_use ) );
 }
 
 int move_mode::swim_speed_mod() const

@@ -1,10 +1,12 @@
-#include "catch/catch.hpp"
+#include <algorithm>
+#include <string>
+#include <vector>
+
+#include "cata_catch.h"
 #include "monster.h"
 #include "mtype.h"
 #include "player_helpers.h"
-#include "speed_description.h"
-
-#include <algorithm>
+#include "type_id.h"
 
 static const mtype_id mon_test_speed_desc_base( "mon_test_speed_desc_base" );
 static const mtype_id mon_test_speed_desc_base_150( "mon_test_speed_desc_base_150" );
@@ -29,7 +31,7 @@ TEST_CASE( "monster_speed_description", "[monster][speed_description]" )
         monster mon( mon_id );
         return monster::speed_description(
                    mon.speed_rating(),
-                   mon.has_flag( MF_IMMOBILE ),
+                   mon.has_flag( mon_flag_IMMOBILE ),
                    mon.type->speed_desc
                );
     };

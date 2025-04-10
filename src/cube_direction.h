@@ -1,11 +1,12 @@
+#pragma once
 #ifndef CATA_SRC_CUBE_DIRECTION_H
 #define CATA_SRC_CUBE_DIRECTION_H
 
+#include <cstddef>
 #include <functional>
 
-#include "enum_traits.h"
-
 struct tripoint;
+template <typename E> struct enum_traits;
 
 namespace om_direction
 {

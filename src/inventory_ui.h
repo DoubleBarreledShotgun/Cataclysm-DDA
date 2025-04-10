@@ -5,40 +5,43 @@
 #include <array>
 #include <climits>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
-#include <iosfwd>
 #include <limits>
 #include <list>
 #include <memory>
-#include <new>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "color.h"
+#include "coordinates.h"
 #include "cuboid_rectangle.h"
 #include "cursesdef.h"
 #include "debug.h"
-#include "input.h"
-#include "item_category.h"
+#include "input_context.h"
 #include "item_location.h"
-#include "item_pocket.h"
-#include "map.h"
 #include "memory_fast.h"
 #include "pimpl.h"
+#include "pocket_type.h"
+#include "point.h"
 #include "translations.h"
-#include "units.h"
 #include "units_fwd.h"
 
 class Character;
+class JsonObject;
+class JsonOut;
+class basecamp;
 class inventory_selector_preset;
 class item;
+class item_category;
 class item_stack;
 class string_input_popup;
+class tinymap;
 class ui_adaptor;
-struct point;
-struct tripoint;
+template <typename E> struct enum_traits;
 
 enum class navigation_mode : int {
     ITEM = 0,
@@ -56,11 +59,7 @@ enum class toggle_mode : int {
 };
 
 struct inventory_input;
-struct container_data;
 struct navigation_mode_data;
-
-using drop_location = std::pair<item_location, int>;
-using drop_locations = std::list<drop_location>;
 
 struct collation_meta_t {
     item_location tip;
@@ -68,6 +67,9 @@ struct collation_meta_t {
     bool enabled = true;
 };
 
+/**
+* A selectable entry in an inventory_selector
+*/
 class inventory_entry
 {
     public:
@@ -77,6 +79,8 @@ class inventory_entry
         int custom_invlet = INT_MIN;
         std::string *cached_name = nullptr;
         std::string *cached_name_full = nullptr;
+        unsigned int contents_count = 0;
+        size_t cached_denial_space = 0;
 
         inventory_entry() = default;
 
@@ -183,8 +187,10 @@ class inventory_entry
         item_location topmost_parent;
         std::shared_ptr<collation_meta_t> collation_meta;
         size_t generation = 0;
+        // for collation; true = header, false = entry
         bool chevron = false;
         int indent = 0;
+        // whether this entry is selectable, highlightable
         mutable bool enabled = true;
         void cache_denial( inventory_selector_preset const &preset ) const;
         mutable std::optional<std::string> denial;
@@ -202,6 +208,7 @@ class inventory_entry
         struct entry_cell_cache_t {
             nc_color color = c_unset;
             std::vector<std::string> text;
+            int lang_version = 0;
         };
 
         const entry_cell_cache_t &get_entry_cell_cache( inventory_selector_preset const &preset ) const;
@@ -219,6 +226,10 @@ class inventory_entry
 };
 
 struct inventory_selector_save_state;
+
+/**
+* Handles how inventory_entry are displayed and selected in an inventory_selector
+*/
 class inventory_selector_preset
 {
     public:
@@ -257,7 +268,7 @@ class inventory_selector_preset
             return check_components;
         }
 
-        item_pocket::pocket_type get_pocket_type() const {
+        pocket_type get_pocket_type() const {
             return _pk_type;
         }
 
@@ -295,7 +306,7 @@ class inventory_selector_preset
         bool _indent_entries = true;
         bool _collate_entries = false;
 
-        item_pocket::pocket_type _pk_type = item_pocket::pocket_type::CONTAINER;
+        pocket_type _pk_type = pocket_type::CONTAINER;
 
     private:
         class cell_t
@@ -319,6 +330,9 @@ class inventory_selector_preset
         std::vector<cell_t> cells;
 };
 
+/**
+* Preset for putting items inside valid containers
+*/
 class inventory_holster_preset : public inventory_selector_preset
 {
     public:
@@ -337,13 +351,13 @@ class inventory_holster_preset : public inventory_selector_preset
 
 const inventory_selector_preset default_preset;
 
+/**
+* Collection of inventory_entry
+*/
 class inventory_column
 {
     public:
-        explicit inventory_column( const inventory_selector_preset &preset = default_preset ) : preset(
-                preset ) {
-            cells.resize( preset.get_cells_count() );
-        }
+        explicit inventory_column( const inventory_selector_preset &preset = default_preset );
 
         virtual ~inventory_column() = default;
 
@@ -498,6 +512,12 @@ class inventory_column
         void uncollate();
         virtual void cycle_hide_override();
 
+        /** Call after items are added to reduce entries to a std::set of single itype_ids
+        * @param include_variants - if true, treats variants as itype_ids -- so two identical variants will
+        * still be removed but different variants of the same itype_id will not
+        */
+        void remove_duplicate_itypes( bool include_variants );
+
     protected:
         /**
          * Move the selection.
@@ -607,6 +627,10 @@ class selection_column : public inventory_column
         inventory_entry last_changed;
 };
 
+/**
+* Selects an item from one or more inventory_column
+* using an inventory_selector_preset to filter if necessary.
+*/
 class inventory_selector
 {
     public:
@@ -617,13 +641,17 @@ class inventory_selector
         bool add_contained_items( item_location &container );
         bool add_contained_items( item_location &container, inventory_column &column,
                                   const item_category *custom_category = nullptr, item_location const &topmost_parent = {},
-                                  int indent = 0 );
-        void add_contained_ebooks( item_location &container );
-        void add_character_items( Character &character );
-        void add_map_items( const tripoint &target );
-        void add_vehicle_items( const tripoint &target );
-        void add_nearby_items( int radius = 1 );
-        void add_remote_map_items( tinymap *remote_map, const tripoint &target );
+                                  int indent = 0, bool add_efiles = false );
+        void add_contained_gunmods( Character &you, item &gun );
+        bool add_contained_ebooks( item_location &container );
+        bool add_contained_efiles( item_location &container );
+        void add_character_items( Character &character, bool add_efiles = false );
+        void add_character_ebooks( Character &character );
+        void add_map_items( const tripoint_bub_ms &target, bool add_efiles = false );
+        void add_vehicle_items( const tripoint_bub_ms &target, bool add_efiles = false );
+        void add_nearby_items( int radius = 1, bool add_efiles = false );
+        void add_remote_map_items( tinymap *remote_map, const tripoint_omt_ms &target );
+        void add_basecamp_items( const basecamp &camp );
         /** Remove all items */
         void clear_items();
         /** Assigns a title that will be shown on top of the menu. */
@@ -642,6 +670,8 @@ class inventory_selector
         bool empty() const;
         /** @return true when there are enabled entries to select. */
         bool has_available_choices() const;
+        uint64_t item_entry_count() const;
+        drop_location get_only_choice() const;
 
         /** Apply filter string to all columns */
         void set_filter( const std::string &str );
@@ -672,6 +702,8 @@ class inventory_selector
 
         void categorize_map_items( bool toggle );
 
+        void remove_duplicate_itypes( bool include_variants );
+
         // An array of cells for the stat lines. Example: ["Weight (kg)", "10", "/", "20"].
         using stat = std::array<std::string, 4>;
         using stats = std::array<stat, 3>;
@@ -686,17 +718,20 @@ class inventory_selector
         input_context ctxt;
 
         const item_category *naturalize_category( const item_category &category,
-                const tripoint &pos );
+                const tripoint_bub_ms &pos );
 
         inventory_entry *add_entry( inventory_column &target_column,
                                     std::vector<item_location> &&locations,
                                     const item_category *custom_category = nullptr,
                                     size_t chosen_count = 0, item_location const &topmost_parent = {},
                                     bool chevron = false );
+        /**
+        * Recursively adds containers (and contents) as entries
+        */
         bool add_entry_rec( inventory_column &entry_column, inventory_column &children_column,
                             item_location &loc, item_category const *entry_category = nullptr,
                             item_category const *children_category = nullptr,
-                            item_location const &topmost_parent = {}, int indent = 0 );
+                            item_location const &topmost_parent = {}, int indent = 0, bool add_efiles = false );
 
         bool drag_drop_item( item *sourceItem, item *destItem );
 
@@ -783,6 +818,7 @@ class inventory_selector
         // NOLINTNEXTLINE(cata-use-named-point-constants)
         point _fixed_origin{ -1, -1 }, _fixed_size{ -1, -1 };
         bool _categorize_map_items = false;
+        bool force_single_column = false;
 
     private:
         // These functions are called from resizing/redraw callbacks of ui_adaptor
@@ -797,8 +833,8 @@ class inventory_selector
         void draw_footer( const catacurses::window &w ) const;
         void draw_columns( const catacurses::window &w );
         void draw_frame( const catacurses::window &w ) const;
-        void _add_map_items( tripoint const &target, item_category const &cat, item_stack &items,
-                             std::function<item_location( item & )> const &floc );
+        void _add_map_items( tripoint_bub_ms const &target, item_category const &cat, item_stack &items,
+                             std::function<item_location( item & )> const &floc, bool add_efiles = false );
 
     public:
         /**
@@ -945,6 +981,23 @@ class container_inventory_selector : public inventory_pick_selector
         item_location loc;
 };
 
+std::vector<item_location> get_possible_reload_targets( const item_location &target );
+class ammo_inventory_selector : public inventory_selector
+{
+    public:
+        explicit ammo_inventory_selector( Character &you, const item_location &reload_loc,
+                                          const inventory_selector_preset &preset = default_preset );
+
+        drop_location execute();
+        void set_all_entries_chosen_count();
+    private:
+        void mod_chosen_count( inventory_entry &entry, int val );
+        const item_location reload_loc;
+};
+
+/**
+* inventory_selector, but capable of selecting multiple items.
+*/
 class inventory_multiselector : public inventory_selector
 {
     public:
@@ -954,7 +1007,7 @@ class inventory_multiselector : public inventory_selector
                                           const std::string &selection_column_title = "",
                                           const GetStats & = {},
                                           bool allow_select_contained = false );
-        drop_locations execute();
+        drop_locations execute( bool allow_empty = false );
         void toggle_entry( inventory_entry &entry, size_t count );
     protected:
         void rearrange_columns( size_t client_width ) override;
@@ -973,6 +1026,20 @@ class inventory_multiselector : public inventory_selector
     private:
         std::unique_ptr<inventory_column> selection_col;
         GetStats get_stats;
+};
+
+class inventory_haul_selector : public inventory_multiselector
+{
+    public:
+        explicit inventory_haul_selector( Character &p );
+        void apply_selection( std::vector<item_location> &items );
+};
+
+class haul_selector_preset : public inventory_selector_preset
+{
+    public:
+        bool is_shown( const item_location &item ) const override;
+        std::string get_denial( const item_location &item ) const override;
 };
 
 class inventory_compare_selector : public inventory_multiselector
@@ -1019,7 +1086,7 @@ class pickup_selector : public inventory_multiselector
     public:
         explicit pickup_selector( Character &p, const inventory_selector_preset &preset = default_preset,
                                   const std::string &selection_column_title = _( "ITEMS TO PICK UP" ),
-                                  const std::optional<tripoint> &where = std::nullopt );
+                                  const std::optional<tripoint_bub_ms> &where = std::nullopt );
         drop_locations execute();
         void apply_selection( std::vector<drop_location> selection );
     protected:
@@ -1029,8 +1096,17 @@ class pickup_selector : public inventory_multiselector
         bool wield( int &count );
         bool wear();
         void remove_from_to_use( item_location &it );
-        void add_reopen_activity();
-        const std::optional<tripoint> where;
+        void reopen_menu();
+        const std::optional<tripoint_bub_ms> where;
+};
+
+class unload_selector : public inventory_pick_selector
+{
+    public:
+        explicit unload_selector( Character &p, const inventory_selector_preset &preset = default_preset );
+        std::pair<item_location, bool> execute();
+    private:
+        std::string hint_string();
 };
 
 /**

@@ -1,12 +1,20 @@
+#include <map>
+#include <string>
+#include <vector>
+
 #include "calendar.h"
 #include "cata_catch.h"
 #include "character.h"
+#include "character_attire.h"
+#include "coordinates.h"
 #include "item.h"
 #include "item_location.h"
 #include "map.h"
 #include "map_helpers.h"
 #include "player_helpers.h"
+#include "recipe.h"
 #include "recipe_dictionary.h"
+#include "type_id.h"
 
 // Tests for disassembling items from an "uncraft" recipe.
 //
@@ -65,7 +73,7 @@ static std::map<itype_id, int> repeat_uncraft( Character &they, const itype_id &
         they.complete_disassemble( it_dis_loc, dis_recip );
 
         // Count how many of each type of item are here
-        for( item &it : get_map().i_at( they.pos() ) ) {
+        for( item &it : get_map().i_at( they.pos_bub() ) ) {
             if( yield_items.count( it.typeId() ) == 0 ) {
                 yield_items[it.typeId()] = it.count();
             } else {
@@ -123,7 +131,7 @@ static int uncraft_yield( Character &they, const itype_id whole_itype, const ity
 //
 // Recovery may still fail if the original item was damaged; for that, see the [damage] test.
 //
-TEST_CASE( "uncraft difficulty and character skill", "[uncraft][difficulty][skill]" )
+TEST_CASE( "uncraft_difficulty_and_character_skill", "[uncraft][difficulty][skill]" )
 {
     Character &they = setup_uncraft_character();
 
@@ -170,7 +178,7 @@ TEST_CASE( "uncraft difficulty and character skill", "[uncraft][difficulty][skil
 }
 
 // Item damage_level (0-5) affects chance of successfully recovering components from disassembly.
-TEST_CASE( "uncraft from a damaged item", "[uncraft][damage]" )
+TEST_CASE( "uncraft_from_a_damaged_item", "[uncraft][damage]" )
 {
     Character &they = setup_uncraft_character();
 

@@ -1,10 +1,22 @@
-#include "character.h"
 #include "character_modifier.h"
+
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <limits>
+
+#include "character.h"
+#include "debug.h"
+#include "effect.h"
 #include "enum_conversions.h"
 #include "flag.h"
+#include "flexbuffer_json.h"
+#include "game_constants.h"
 #include "generic_factory.h"
 #include "messages.h"
 #include "move_mode.h"
+#include "output.h"
+#include "string_formatter.h"
 
 static const character_modifier_id
 character_modifier_limb_footing_movecost_mod( "limb_footing_movecost_mod" );
@@ -189,7 +201,7 @@ float Character::manipulator_score( const std::map<bodypart_str_id, bodypart> &b
                     }
                 }
             }
-            total = std::min( total + id.first.get_limb_score( limb_score_manip, -1, override_encumb,
+            total = std::min( total + id.first.get_limb_score( *this, limb_score_manip, -1, override_encumb,
                               override_wounds ) * id.second * local_mul,
                               id.first.get_limb_score_max( limb_score_manip ) * local_mul * id.second );
         }
@@ -223,15 +235,17 @@ float Character::get_limb_score( const limb_score_id &score, const body_part_typ
         skill = round( get_skill_level( skill_swimming ) );
     }
     float total = 0.0f;
+    // Avoid call has_flag() in a loop to improve performance
+    bool cache_flag_EFFECT_LIMB_SCORE_MOD_LOCAL = has_flag( flag_EFFECT_LIMB_SCORE_MOD_LOCAL );
     for( const std::pair<const bodypart_str_id, bodypart> &id : body ) {
         float mod = 0.0f;
         if( bp == body_part_type::type::num_types ) {
-            mod = id.second.get_limb_score( score, skill, override_encumb, override_wounds );
+            mod = id.second.get_limb_score( *this, score, skill, override_encumb, override_wounds );
         } else if( id.first->has_type( bp ) ) {
-            mod = id.second.get_limb_score( score, skill, override_encumb,
+            mod = id.second.get_limb_score( *this, score, skill, override_encumb,
                                             override_wounds ) * id.first->limbtypes.at( bp );
         }
-        if( has_flag( flag_EFFECT_LIMB_SCORE_MOD_LOCAL ) ) {
+        if( cache_flag_EFFECT_LIMB_SCORE_MOD_LOCAL ) {
             for( const effect &local : get_effects_from_bp( id.first ) ) {
                 float local_mul = 1.0f;
                 // Second filter to only apply the local effects at this step (non-local modifiers are already calulated)

@@ -6,7 +6,7 @@
     "messages": [ "You unleash a fiery attack against %s", "<npcname> unleash a fiery attack against %s" ],
     "melee_allowed": true,
     "flat_bonuses": [ { "stat": "damage", "type": "heat", "scale": 3.0 } ],
-    "attack_vectors": [ "WEAPON" ]
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -17,7 +17,7 @@
     "melee_allowed": true,
     "crit_tec": true,
     "flat_bonuses": [ { "stat": "damage", "type": "heat", "scale": 7.0 } ],
-    "attack_vectors": [ "WEAPON" ]
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -29,7 +29,7 @@
     "crit_ok": true,
     "aoe": "impale",
     "flat_bonuses": [ { "stat": "damage", "type": "heat", "scale": 7.0 } ],
-    "attack_vectors": [ "WEAPON" ]
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -44,7 +44,7 @@
     "crit_tec": true,
     "aoe": "spin",
     "flat_bonuses": [ { "stat": "damage", "type": "heat", "scale": 10.0 } ],
-    "attack_vectors": [ "WEAPON" ]
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -54,7 +54,7 @@
     "skill_requirements": [ { "name": "melee", "level": 2 } ],
     "melee_allowed": true,
     "aoe": "wide",
-    "attack_vectors": [ "WEAPON" ]
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -64,7 +64,7 @@
     "skill_requirements": [ { "name": "melee", "level": 1 } ],
     "melee_allowed": true,
     "flat_bonuses": [ { "stat": "damage", "type": "stab", "scaling-stat": "int", "scale": 0.5 } ],
-    "attack_vectors": [ "WEAPON" ]
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -75,7 +75,7 @@
     "melee_allowed": true,
     "crit_tec": true,
     "flat_bonuses": [ { "stat": "damage", "type": "stab", "scaling-stat": "int", "scale": 1.0 } ],
-    "attack_vectors": [ "WEAPON" ]
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -90,7 +90,7 @@
     "required_buffs_any": [ "mma_buff_hylian_onpause", "mma_buff_hylian_spin" ],
     "crit_ok": true,
     "aoe": "spin",
-    "attack_vectors": [ "WEAPON" ]
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -105,7 +105,7 @@
     "required_buffs_any": [ "mma_buff_hylian_onpause", "mma_buff_hylian_spin" ],
     "crit_ok": true,
     "aoe": "wide",
-    "attack_vectors": [ "WEAPON" ]
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -114,7 +114,16 @@
     "messages": [ "You skillfully disarm %s", "<npcname> skillfully disarms %s" ],
     "unarmed_allowed": true,
     "disarms": true,
-    "attack_vectors": [ "WEAPON" ]
+    "tech_effects": [
+      {
+        "id": "disarmed",
+        "chance": 100,
+        "duration": 400,
+        "on_damage": true,
+        "message": "The weapon of %s has been forced out of their hands!"
+      }
+    ],
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -125,7 +134,7 @@
     "melee_allowed": true,
     "defensive": true,
     "miss_recovery": true,
-    "attack_vectors": [ "WEAPON" ]
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -135,13 +144,38 @@
     "skill_requirements": [ { "name": "melee", "level": 5 } ],
     "melee_allowed": true,
     "crit_tec": true,
+    "condition": {
+      "and": [
+        { "math": [ "u_val('size') + 1 >= n_val('size')" ] },
+        { "not": { "npc_has_effect": "stunned" } },
+        {
+          "and": [
+            { "not": { "npc_has_species": "ZOMBIE" } },
+            { "not": { "npc_has_species": "NETHER" } },
+            { "not": { "npc_has_species": "NETHER_EMANATION" } },
+            { "not": { "npc_has_species": "LEECH_PLANT" } },
+            { "not": { "npc_has_species": "MIGO" } },
+            { "not": { "npc_has_species": "SLIME" } },
+            { "not": { "npc_has_species": "FUNGUS" } },
+            { "not": { "npc_has_species": "PLANT" } },
+            { "not": { "npc_has_species": "ROBOT" } },
+            { "not": { "npc_has_species": "CYBORG" } },
+            { "not": { "npc_has_species": "HALLUCINATION" } },
+            { "not": { "npc_has_species": "HORROR" } },
+            { "not": { "npc_has_species": "ABERRATION" } },
+            { "not": { "npc_has_species": "KRAKEN" } }
+          ]
+        }
+      ]
+    },
+    "condition_desc": "* Only works on a <info>non-stunned mundane</info> target of <info>similar or smaller</info> size",
     "stun_dur": 1,
     "mult_bonuses": [
       { "stat": "damage", "type": "bash", "scale": 1.25 },
       { "stat": "damage", "type": "cut", "scale": 1.25 },
       { "stat": "damage", "type": "stab", "scale": 1.25 }
     ],
-    "attack_vectors": [ "WEAPON" ]
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -151,13 +185,38 @@
     "skill_requirements": [ { "name": "melee", "level": 2 } ],
     "melee_allowed": true,
     "crit_tec": true,
+    "condition": {
+      "and": [
+        { "math": [ "u_val('size') + 1 >= n_val('size')" ] },
+        { "not": { "npc_has_effect": "stunned" } },
+        {
+          "and": [
+            { "not": { "npc_has_species": "ZOMBIE" } },
+            { "not": { "npc_has_species": "NETHER" } },
+            { "not": { "npc_has_species": "NETHER_EMANATION" } },
+            { "not": { "npc_has_species": "LEECH_PLANT" } },
+            { "not": { "npc_has_species": "MIGO" } },
+            { "not": { "npc_has_species": "SLIME" } },
+            { "not": { "npc_has_species": "FUNGUS" } },
+            { "not": { "npc_has_species": "PLANT" } },
+            { "not": { "npc_has_species": "ROBOT" } },
+            { "not": { "npc_has_species": "CYBORG" } },
+            { "not": { "npc_has_species": "HALLUCINATION" } },
+            { "not": { "npc_has_species": "HORROR" } },
+            { "not": { "npc_has_species": "ABERRATION" } },
+            { "not": { "npc_has_species": "KRAKEN" } }
+          ]
+        }
+      ]
+    },
+    "condition_desc": "* Only works on a <info>non-stunned mundane</info> target of <info>similar or smaller</info> size",
     "stun_dur": 1,
     "mult_bonuses": [
       { "stat": "damage", "type": "bash", "scale": 1.4 },
       { "stat": "damage", "type": "cut", "scale": 1.4 },
       { "stat": "damage", "type": "stab", "scale": 1.4 }
     ],
-    "attack_vectors": [ "WEAPON" ]
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -170,7 +229,7 @@
     "skill_requirements": [ { "name": "melee", "level": 3 } ],
     "melee_allowed": true,
     "aoe": "wide",
-    "attack_vectors": [ "WEAPON" ]
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -186,7 +245,7 @@
       { "stat": "damage", "type": "cut", "scale": 1.25 },
       { "stat": "damage", "type": "stab", "scale": 1.25 }
     ],
-    "attack_vectors": [ "WEAPON" ]
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -201,7 +260,7 @@
       { "stat": "damage", "type": "cut", "scale": 1.2 },
       { "stat": "damage", "type": "stab", "scale": 1.2 }
     ],
-    "attack_vectors": [ "WEAPON", "FOOT" ]
+    "attack_vectors": [ "vector_null", "vector_foot_heel" ]
   },
   {
     "type": "technique",
@@ -213,6 +272,31 @@
     "melee_allowed": true,
     "unarmed_allowed": true,
     "crit_tec": true,
+    "condition": {
+      "and": [
+        { "math": [ "u_val('size') + 1 >= n_val('size')" ] },
+        { "not": { "npc_has_effect": "stunned" } },
+        {
+          "and": [
+            { "not": { "npc_has_species": "ZOMBIE" } },
+            { "not": { "npc_has_species": "NETHER" } },
+            { "not": { "npc_has_species": "NETHER_EMANATION" } },
+            { "not": { "npc_has_species": "LEECH_PLANT" } },
+            { "not": { "npc_has_species": "MIGO" } },
+            { "not": { "npc_has_species": "SLIME" } },
+            { "not": { "npc_has_species": "FUNGUS" } },
+            { "not": { "npc_has_species": "PLANT" } },
+            { "not": { "npc_has_species": "ROBOT" } },
+            { "not": { "npc_has_species": "CYBORG" } },
+            { "not": { "npc_has_species": "HALLUCINATION" } },
+            { "not": { "npc_has_species": "HORROR" } },
+            { "not": { "npc_has_species": "ABERRATION" } },
+            { "not": { "npc_has_species": "KRAKEN" } }
+          ]
+        }
+      ]
+    },
+    "condition_desc": "* Only works on a <info>non-stunned mundane</info> target of <info>similar or smaller</info> size",
     "stun_dur": 1,
     "flat_bonuses": [
       { "stat": "arpen", "type": "bash", "scaling-stat": "per", "scale": 1.0 },
@@ -225,7 +309,7 @@
       { "stat": "damage", "type": "cut", "scale": 1.5 },
       { "stat": "damage", "type": "stab", "scale": 1.5 }
     ],
-    "attack_vectors": [ "WEAPON", "HAND" ]
+    "attack_vectors": [ "vector_null", "vector_punch" ]
   },
   {
     "type": "technique",
@@ -242,7 +326,7 @@
       { "stat": "damage", "type": "cut", "scale": 0.66 },
       { "stat": "damage", "type": "stab", "scale": 0.66 }
     ],
-    "attack_vectors": [ "WEAPON", "HAND" ]
+    "attack_vectors": [ "vector_null", "vector_punch" ]
   },
   {
     "type": "technique",
@@ -257,7 +341,7 @@
       { "stat": "damage", "type": "cut", "scale": 2.0 },
       { "stat": "damage", "type": "stab", "scale": 2.0 }
     ],
-    "attack_vectors": [ "FOOT" ]
+    "attack_vectors": [ "vector_foot_sole" ]
   },
   {
     "type": "technique",
@@ -272,7 +356,7 @@
       { "stat": "arpen", "type": "cut", "scaling-stat": "str", "scale": 1.5 },
       { "stat": "arpen", "type": "stab", "scaling-stat": "str", "scale": 1.5 }
     ],
-    "attack_vectors": [ "ARM" ]
+    "attack_vectors": [ "vector_arm" ]
   },
   {
     "type": "technique",
@@ -283,7 +367,7 @@
     "unarmed_allowed": true,
     "crit_ok": true,
     "flat_bonuses": [ { "stat": "hit", "scale": 5.0 } ],
-    "attack_vectors_random": [ "HAND", "FOOT", "HEAD", "TORSO", "HEAD" ]
+    "attack_vectors": [ "vector_punch", "vector_foot_toes", "vector_headbutt", "vector_shoulder" ]
   },
   {
     "type": "technique",
@@ -293,8 +377,17 @@
     "skill_requirements": [ { "name": "unarmed", "level": 3 } ],
     "unarmed_allowed": true,
     "crit_ok": true,
+    "condition": {
+      "and": [
+        { "math": [ "u_val('size') + 1 >= n_val('size')" ] },
+        { "not": { "npc_has_effect": "downed" } },
+        { "or": [ { "npc_bodytype": "human" }, { "npc_bodytype": "angel" } ] },
+        { "or": [ { "not": { "npc_has_flag": "FLIES" } }, { "npc_has_flag": "DISABLE_FLIGHT" } ] }
+      ]
+    },
+    "condition_desc": "* Only works on a <info>non-downed humanoid</info> target of <info>similar or smaller</info> size incapable of flight",
     "down_dur": 1,
-    "attack_vectors_random": [ "FOOT", "LOWER_LEG" ]
+    "attack_vectors": [ "vector_foot_toes", "vector_shin" ]
   },
   {
     "type": "technique",
@@ -305,8 +398,33 @@
     "melee_allowed": true,
     "unarmed_allowed": true,
     "crit_tec": true,
+    "condition": {
+      "and": [
+        { "math": [ "u_val('size') + 1 >= n_val('size')" ] },
+        { "not": { "npc_has_effect": "stunned" } },
+        {
+          "and": [
+            { "not": { "npc_has_species": "ZOMBIE" } },
+            { "not": { "npc_has_species": "NETHER" } },
+            { "not": { "npc_has_species": "NETHER_EMANATION" } },
+            { "not": { "npc_has_species": "LEECH_PLANT" } },
+            { "not": { "npc_has_species": "MIGO" } },
+            { "not": { "npc_has_species": "SLIME" } },
+            { "not": { "npc_has_species": "FUNGUS" } },
+            { "not": { "npc_has_species": "PLANT" } },
+            { "not": { "npc_has_species": "ROBOT" } },
+            { "not": { "npc_has_species": "CYBORG" } },
+            { "not": { "npc_has_species": "HALLUCINATION" } },
+            { "not": { "npc_has_species": "HORROR" } },
+            { "not": { "npc_has_species": "ABERRATION" } },
+            { "not": { "npc_has_species": "KRAKEN" } }
+          ]
+        }
+      ]
+    },
+    "condition_desc": "* Only works on a <info>non-stunned mundane</info> target of <info>similar or smaller</info> size",
     "stun_dur": 1,
-    "attack_vectors": [ "WEAPON", "HAND" ]
+    "attack_vectors": [ "vector_null", "vector_punch" ]
   },
   {
     "type": "technique",
@@ -317,6 +435,29 @@
     "melee_allowed": true,
     "unarmed_allowed": true,
     "required_buffs_all": [ "mma_buff_setting_sun_onpause" ],
+    "condition": {
+      "and": [
+        { "math": [ "u_val('size') + 1 >= n_val('size')" ] },
+        { "not": { "npc_has_effect": "downed" } },
+        {
+          "or": [
+            {
+              "and": [
+                { "npc_has_flag": "GRAB_FILTER" },
+                { "u_has_flag": "GRAB" },
+                {
+                  "roll_contested": { "math": [ "u_val('strength')" ] },
+                  "die_size": 20,
+                  "difficulty": { "math": [ "n_val('grab_strength')" ] }
+                }
+              ]
+            },
+            { "not": { "and": [ { "npc_has_flag": "GRAB_FILTER" }, { "u_has_flag": "GRAB" } ] } }
+          ]
+        }
+      ]
+    },
+    "condition_desc": "* Only works on a <info>non-downed</info> target of <info>similar or smaller</info> size, may fail on enemies grabbing you",
     "down_dur": 2,
     "knockback_dist": 2,
     "mult_bonuses": [
@@ -324,7 +465,7 @@
       { "stat": "damage", "type": "cut", "scale": 1.33 },
       { "stat": "damage", "type": "stab", "scale": 1.33 }
     ],
-    "attack_vectors": [ "THROW" ]
+    "attack_vectors": [ "vector_grasp" ]
   },
   {
     "type": "technique",
@@ -336,16 +477,38 @@
     "unarmed_allowed": true,
     "required_buffs_all": [ "mma_buff_setting_sun_onpause" ],
     "crit_tec": true,
+    "condition": {
+      "and": [
+        { "math": [ "u_val('size') + 1 >= n_val('size')" ] },
+        { "not": { "npc_has_effect": "downed" } },
+        {
+          "or": [
+            {
+              "and": [
+                { "npc_has_flag": "GRAB_FILTER" },
+                { "u_has_flag": "GRAB" },
+                {
+                  "roll_contested": { "math": [ "u_val('strength')" ] },
+                  "die_size": 20,
+                  "difficulty": { "math": [ "n_val('grab_strength')" ] }
+                }
+              ]
+            },
+            { "not": { "and": [ { "npc_has_flag": "GRAB_FILTER" }, { "u_has_flag": "GRAB" } ] } }
+          ]
+        }
+      ]
+    },
+    "condition_desc": "* Only works on a <info>non-downed</info> target of <info>similar or smaller</info> size, may fail on enemies grabbing you",
     "down_dur": 2,
     "knockback_dist": 4,
-    "powerful_knockback": true,
     "weighting": 2,
     "mult_bonuses": [
       { "stat": "damage", "type": "bash", "scale": 1.5 },
       { "stat": "damage", "type": "cut", "scale": 1.5 },
       { "stat": "damage", "type": "stab", "scale": 1.5 }
     ],
-    "attack_vectors": [ "THROW" ]
+    "attack_vectors": [ "vector_grasp" ]
   },
   {
     "type": "technique",
@@ -356,7 +519,16 @@
     "melee_allowed": true,
     "crit_ok": true,
     "disarms": true,
-    "attack_vectors": [ "WEAPON" ]
+    "tech_effects": [
+      {
+        "id": "disarmed",
+        "chance": 100,
+        "duration": 400,
+        "on_damage": true,
+        "message": "The weapon of %s has been forced out of their hands!"
+      }
+    ],
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -367,7 +539,7 @@
     "melee_allowed": true,
     "crit_ok": true,
     "aoe": "wide",
-    "attack_vectors": [ "WEAPON" ]
+    "attack_vectors": [ "vector_null" ]
   },
   {
     "type": "technique",
@@ -385,19 +557,44 @@
       { "stat": "arpen", "type": "cut", "scaling-stat": "str", "scale": 0.5 },
       { "stat": "arpen", "type": "stab", "scaling-stat": "str", "scale": 0.5 }
     ],
-    "attack_vectors": [ "WEAPON", "HAND" ]
+    "attack_vectors": [ "vector_null", "vector_wrist" ]
   },
   {
     "type": "technique",
     "id": "mma_tec_stone_dragon_strike",
-    "name": "Irrestistible Mountain Strike",
+    "name": "Irresistible Mountain Strike",
     "messages": [ "You smash down on %s with a Mountain Strike", "<npcname> smashes down on %s with a Mountain Strike" ],
     "skill_requirements": [ { "name": "melee", "level": 3 } ],
     "melee_allowed": true,
     "unarmed_allowed": true,
     "crit_tec": true,
+    "condition": {
+      "and": [
+        { "math": [ "u_val('size') + 1 >= n_val('size')" ] },
+        { "not": { "npc_has_effect": "stunned" } },
+        {
+          "and": [
+            { "not": { "npc_has_species": "ZOMBIE" } },
+            { "not": { "npc_has_species": "NETHER" } },
+            { "not": { "npc_has_species": "NETHER_EMANATION" } },
+            { "not": { "npc_has_species": "LEECH_PLANT" } },
+            { "not": { "npc_has_species": "MIGO" } },
+            { "not": { "npc_has_species": "SLIME" } },
+            { "not": { "npc_has_species": "FUNGUS" } },
+            { "not": { "npc_has_species": "PLANT" } },
+            { "not": { "npc_has_species": "ROBOT" } },
+            { "not": { "npc_has_species": "CYBORG" } },
+            { "not": { "npc_has_species": "HALLUCINATION" } },
+            { "not": { "npc_has_species": "HORROR" } },
+            { "not": { "npc_has_species": "ABERRATION" } },
+            { "not": { "npc_has_species": "KRAKEN" } }
+          ]
+        }
+      ]
+    },
+    "condition_desc": "* Only works on a <info>non-stunned mundane</info> target of <info>similar or smaller</info> size",
     "stun_dur": 1,
-    "attack_vectors": [ "WEAPON", "HAND" ]
+    "attack_vectors": [ "vector_null", "vector_wrist" ]
   },
   {
     "type": "technique",
@@ -408,6 +605,8 @@
     "melee_allowed": true,
     "unarmed_allowed": true,
     "crit_ok": true,
+    "condition": { "not": { "npc_has_effect": "downed" } },
+    "condition_desc": "* Only works on a <info>non-downed</info> target",
     "down_dur": 1,
     "knockback_dist": 2,
     "mult_bonuses": [
@@ -415,15 +614,15 @@
       { "stat": "damage", "type": "cut", "scale": 1.3 },
       { "stat": "damage", "type": "stab", "scale": 1.3 }
     ],
-    "attack_vectors": [ "WEAPON", "HAND" ]
+    "attack_vectors": [ "vector_null", "vector_punch" ]
   },
   {
     "type": "technique",
     "id": "mma_tec_tiger_claw_break",
     "name": "Wolverine Stance",
     "messages": [
-      "The %s tries to grab you, but you thrash your way to freedom!",
-      "The %s tries to grab <npcname>, but they thrash their way to freedom!"
+      "You were almost grabbed by %s, but you thrash your way to freedom",
+      "<npcname> was almost grabbed by %s, but they thrash their way to freedom"
     ],
     "melee_allowed": true,
     "unarmed_allowed": true,

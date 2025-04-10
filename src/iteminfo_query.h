@@ -4,7 +4,7 @@
 
 #include <bitset>
 #include <cstddef>
-#include <iosfwd>
+#include <string>
 #include <vector>
 
 enum class iteminfo_parts : size_t {
@@ -16,6 +16,7 @@ enum class iteminfo_parts : size_t {
     BASE_VOLUME,
     BASE_WEIGHT,
     BASE_LENGTH,
+    BASE_EMEMORY,
     BASE_RIGIDITY,
     BASE_DAMAGE,
     BASE_TOHIT,
@@ -85,6 +86,7 @@ enum class iteminfo_parts : size_t {
     AMMO_UPSCOST,
     AMMO_TO_FIRE,
 
+    GUN_DEFAULT_BORE,
     GUN_DEFAULT_AMMO,
     GUN_MAX_RANGE,
     GUN_AIMING_STATS,
@@ -104,7 +106,9 @@ enum class iteminfo_parts : size_t {
     GUN_RECOIL,
     GUN_RECOIL_BIPOD,
 
-    GUN_RECOMMENDED_STRENGTH,
+    GUN_RECOIL_THEORETICAL_MINIMUM,
+    GUN_IDEAL_STRENGTH,
+
     GUN_RELOAD_TIME,
 
     GUN_FIRE_MODES,
@@ -126,6 +130,7 @@ enum class iteminfo_parts : size_t {
     GUNMOD_RANGE_MULTIPLIER,
     GUNMOD_HANDLING,
     GUNMOD_LOUDNESS_MODIFIER,
+    GUNMOD_LOUDNESS_MULTIPLIER,
     GUNMOD_AMMO,
     GUNMOD_RELOAD,
     GUNMOD_STRENGTH,
@@ -135,6 +140,7 @@ enum class iteminfo_parts : size_t {
     GUNMOD_USEDON,
     GUNMOD_LOCATION,
     GUNMOD_BLACKLIST_MOD,
+    GUNMOD_BLACKLIST_SLOT,
 
     ARMOR_BODYGRAPH,
     ARMOR_BODYPARTS,
@@ -217,14 +223,19 @@ enum class iteminfo_parts : size_t {
     DESCRIPTION_RADIOACTIVITY_DAMAGED,
     DESCRIPTION_RADIOACTIVITY_ALWAYS,
 
+    DESCRIPTION_MILLEABLE,
+
     DESCRIPTION_BREWABLE_DURATION,
     DESCRIPTION_BREWABLE_PRODUCTS,
+
+    DESCRIPTION_COMPOSTABLE_DURATION,
+    DESCRIPTION_COMPOSTABLE_PRODUCTS,
 
     DESCRIPTION_FAULTS,
 
     DESCRIPTION_POCKETS,
 
-    DESCRIPTION_HOLSTERS,
+    DESCRIPTION_ARMOR_CONTAINERS,
 
     DESCRIPTION_ACTIVATABLE_TRANSFORMATION,
 

@@ -1,6 +1,6 @@
 #include "TranslatorCommentsCheck.h"
 
-#include <ClangTidyDiagnosticConsumer.h>
+#include <clang-tidy/ClangTidyDiagnosticConsumer.h>
 #include <clang/AST/ASTContext.h>
 #include <clang/AST/Expr.h>
 #include <clang/ASTMatchers/ASTMatchers.h>
@@ -35,8 +35,6 @@ namespace clang
 {
 namespace ast_matchers
 {
-namespace
-{
 AST_POLYMORPHIC_MATCHER_P2( hasImmediateArgument,
                             AST_POLYMORPHIC_SUPPORTED_TYPES( CallExpr, CXXConstructExpr ),
                             unsigned int, N, ast_matchers::internal::Matcher<Expr>, InnerMatcher )
@@ -53,7 +51,6 @@ AST_MATCHER_P( StringLiteral, isMarkedString, tidy::cata::TranslatorCommentsChec
     return Check->MarkedStrings.find( Loc ) != Check->MarkedStrings.end();
     static_cast<void>( Builder );
 }
-} // namespace
 } // namespace ast_matchers
 namespace tidy::cata
 {
@@ -231,7 +228,7 @@ void TranslatorCommentsCheck::registerMatchers( MatchFinder *Finder )
         );
     Finder->addMatcher(
         callExpr(
-            callee( functionDecl( hasAnyName( "_", "translation_argument_identity", "gettext" ) ) ),
+            callee( functionDecl( hasAnyName( "_", "translation_argument_identity" ) ) ),
             hasImmediateArgument( 0, stringLiteralArgumentBound )
         ),
         this

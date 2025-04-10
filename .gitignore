@@ -10,6 +10,7 @@
 *.apk
 *.log
 /WinDepend/
+/achievements/
 /bindist/
 /build/
 /build-start-time
@@ -33,6 +34,7 @@
 /src/prefix.h
 /sound/
 /templates/
+/export_dir/
 /tools/format/json_formatter.cgi
 CataclysmWin.cscope_file_list
 CataclysmWin.depend
@@ -47,6 +49,8 @@ chkjson*
 debug.log
 logg.txt
 json_formatter
+*.output
+.cache/
 
 # Visual Studio files
 *.code-workspace
@@ -62,14 +66,20 @@ json_formatter
 *.vcxproj.filters
 *.lastbuildstate
 .vs/
-.vscode/
 Directory.Build.props
 Directory.Build.targets
+
+# Visual Studio Code
+.vscode/
+.vscode/**
+!.vscode/settings.json
+!.vscode/extensions.json
 
 # Visual Studio project files
 /msvc-full-features/**/
 
 # Temporary CMakeFiles
+CMakeFiles/git-data
 CMakeUserPresets.json
 out/
 
@@ -144,6 +154,9 @@ __pycache__
 # vimdiff backup
 *.orig
 
+# obsidian.md files
+.obsidian
+
 # OSX
 Cataclysm.app
 build-data/osx/AppIcon.icns
@@ -184,6 +197,7 @@ cataclysm.a
 # clang tooling
 compile_commands.json
 .clangd
+clang-tidy-trace/
 
 # IDA database
 Cataclysm.i64
@@ -223,6 +237,7 @@ Xcode/
 /tests/pch/tests-pch.hpp.pch
 /tests/catch/catch.hpp.gch
 /tests/catch/catch.hpp.pch
+cities.output
 weather.output
 
 # bundler local directories and files for jekyll site

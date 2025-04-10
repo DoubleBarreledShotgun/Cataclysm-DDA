@@ -1,5 +1,6 @@
 #include "flexbuffer_json.h"
 
+#include <atomic>
 #include <cstring>
 #include <istream>
 #include <optional>
@@ -7,6 +8,16 @@
 #include "cata_unreachable.h"
 #include "filesystem.h"
 #include "json.h"
+
+namespace
+{
+std::atomic_bool report_unvisited_members{true};
+} // namespace
+
+bool Json::globally_report_unvisited_members( bool do_report )
+{
+    return report_unvisited_members.exchange( do_report );
+}
 
 const std::string &Json::flexbuffer_type_to_string( flexbuffers::Type t )
 {
@@ -132,7 +143,7 @@ std::string Json::str() const
 bool JsonValue::read( bool &b, bool throw_on_error ) const
 {
     if( !test_bool() ) {
-        return error_or_false( throw_on_error, "Expected bool" );
+        return error_or_false( throw_on_error, "Syntax error.  Expected bool" );
     }
     b = get_bool();
     return true;
@@ -140,7 +151,7 @@ bool JsonValue::read( bool &b, bool throw_on_error ) const
 bool JsonValue::read( char &c, bool throw_on_error ) const
 {
     if( !test_number() ) {
-        return error_or_false( throw_on_error, "Expected number" );
+        return error_or_false( throw_on_error, "Syntax error.  Expected number" );
     }
     c = get_int();
     return true;
@@ -148,7 +159,7 @@ bool JsonValue::read( char &c, bool throw_on_error ) const
 bool JsonValue::read( signed char &c, bool throw_on_error ) const
 {
     if( !test_number() ) {
-        return error_or_false( throw_on_error, "Expected number" );
+        return error_or_false( throw_on_error, "Syntax error.  Expected number" );
     }
     // TODO: test for overflow
     c = get_int();
@@ -157,7 +168,7 @@ bool JsonValue::read( signed char &c, bool throw_on_error ) const
 bool JsonValue::read( unsigned char &c, bool throw_on_error ) const
 {
     if( !test_number() ) {
-        return error_or_false( throw_on_error, "Expected number" );
+        return error_or_false( throw_on_error, "Syntax error.  Expected number" );
     }
     // TODO: test for overflow
     c = get_int();
@@ -166,7 +177,7 @@ bool JsonValue::read( unsigned char &c, bool throw_on_error ) const
 bool JsonValue::read( short unsigned int &s, bool throw_on_error ) const
 {
     if( !test_number() ) {
-        return error_or_false( throw_on_error, "Expected number" );
+        return error_or_false( throw_on_error, "Syntax error.  Expected number" );
     }
     // TODO: test for overflow
     s = get_int();
@@ -175,7 +186,7 @@ bool JsonValue::read( short unsigned int &s, bool throw_on_error ) const
 bool JsonValue::read( short int &s, bool throw_on_error ) const
 {
     if( !test_number() ) {
-        return error_or_false( throw_on_error, "Expected number" );
+        return error_or_false( throw_on_error, "Syntax error.  Expected number" );
     }
     // TODO: test for overflow
     s = get_int();
@@ -184,7 +195,7 @@ bool JsonValue::read( short int &s, bool throw_on_error ) const
 bool JsonValue::read( int &i, bool throw_on_error ) const
 {
     if( !test_number() ) {
-        return error_or_false( throw_on_error, "Expected number" );
+        return error_or_false( throw_on_error, "Syntax error.  Expected number" );
     }
     i = get_int();
     return true;
@@ -192,7 +203,7 @@ bool JsonValue::read( int &i, bool throw_on_error ) const
 bool JsonValue::read( int64_t &i, bool throw_on_error ) const
 {
     if( !test_number() ) {
-        return error_or_false( throw_on_error, "Expected number" );
+        return error_or_false( throw_on_error, "Syntax error.  Expected number" );
     }
     i = get_int64();
     return true;
@@ -200,7 +211,7 @@ bool JsonValue::read( int64_t &i, bool throw_on_error ) const
 bool JsonValue::read( uint64_t &i, bool throw_on_error ) const
 {
     if( !test_number() ) {
-        return error_or_false( throw_on_error, "Expected number" );
+        return error_or_false( throw_on_error, "Syntax error.  Expected number" );
     }
     i = get_uint64();
     return true;
@@ -208,7 +219,7 @@ bool JsonValue::read( uint64_t &i, bool throw_on_error ) const
 bool JsonValue::read( unsigned int &u, bool throw_on_error ) const
 {
     if( !test_number() ) {
-        return error_or_false( throw_on_error, "Expected number" );
+        return error_or_false( throw_on_error, "Syntax error.  Expected number" );
     }
     u = get_uint();
     return true;
@@ -216,7 +227,7 @@ bool JsonValue::read( unsigned int &u, bool throw_on_error ) const
 bool JsonValue::read( float &f, bool throw_on_error ) const
 {
     if( !test_number() ) {
-        return error_or_false( throw_on_error, "Expected number" );
+        return error_or_false( throw_on_error, "Syntax error.  Expected number" );
     }
     f = get_float();
     return true;
@@ -224,7 +235,7 @@ bool JsonValue::read( float &f, bool throw_on_error ) const
 bool JsonValue::read( double &d, bool throw_on_error ) const
 {
     if( !test_number() ) {
-        return error_or_false( throw_on_error, "Expected number" );
+        return error_or_false( throw_on_error, "Syntax error.  Expected number" );
     }
     d = get_float();
     return true;
@@ -232,7 +243,7 @@ bool JsonValue::read( double &d, bool throw_on_error ) const
 bool JsonValue::read( std::string &s, bool throw_on_error ) const
 {
     if( !test_string() ) {
-        return error_or_false( throw_on_error, "Expected string" );
+        return error_or_false( throw_on_error, "Syntax error.  Expected string" );
     }
     s = get_string();
     return true;
@@ -240,7 +251,8 @@ bool JsonValue::read( std::string &s, bool throw_on_error ) const
 
 void JsonObject::report_unvisited() const
 {
-    if( !visited_fields_bitset_.all() ) {
+#ifndef CATA_IN_TOOL
+    if( !std::uncaught_exceptions() && report_unvisited_members && !visited_fields_bitset_.all() ) {
         std::vector<size_t> skipped_members;
         skipped_members.reserve( visited_fields_bitset_.size() );
         tiny_bitset::block_t *bits = visited_fields_bitset_.bits();
@@ -250,7 +262,7 @@ void JsonObject::report_unvisited() const
             tiny_bitset::block_t block = bits[block_idx];
             tiny_bitset::block_t mask = tiny_bitset::kLowBit << ( tiny_bitset::kBitsPerBlock - 1 );
             for( size_t bit_idx = 0; bit_idx < tiny_bitset::kBitsPerBlock; ++bit_idx ) {
-                if( block & mask ) {
+                if( !( block & mask ) ) {
                     skipped_members.emplace_back( block_idx * tiny_bitset::kBitsPerBlock + bit_idx );
                 }
                 mask >>= 1;
@@ -267,9 +279,19 @@ void JsonObject::report_unvisited() const
             mask >>= 1;
         }
 
-        error_skipped_members( skipped_members );
+        // Don't error on skipped comments.
+        skipped_members.erase( std::remove_if( skipped_members.begin(),
+        skipped_members.end(), [this]( size_t idx ) {
+            flexbuffers::String name = keys_[idx].AsString();
+            return strncmp( "//", name.c_str(), 2 ) == 0 && strcmp( "//~", name.c_str() ) != 0;
+        } ), skipped_members.end() );
+
+        if( !skipped_members.empty() ) {
+            error_skipped_members( skipped_members );
+        }
         visited_fields_bitset_.set_all();
     }
+#endif
 }
 
 void JsonObject::error_no_member( const std::string_view member ) const
@@ -311,14 +333,18 @@ void JsonObject::error_skipped_members( const std::vector<size_t> &skipped_membe
     jo.allow_omitted_members();
     for( size_t skipped_member_idx : skipped_members ) {
         flexbuffers::String name = keys_[skipped_member_idx].AsString();
-        if( strncmp( "//", name.c_str(), 2 ) != 0 ) {
-            try {
+        try {
+            if( strcmp( "//~", name.c_str() ) == 0 ) {
+                jo.throw_error_at(
+                    name.c_str(),
+                    "\"//~\" should be within a text object and contain comments for translators." );
+            } else {
                 jo.throw_error_at( name.c_str(),
-                                   string_format( "Invalid or misplaced field name \"%s\" in JSON data",
+                                   string_format( "Unread data.  Invalid or misplaced field name \"%s\" in JSON data",
                                                   name.c_str() ) );
-            } catch( const JsonError &e ) {
-                debugmsg( "(json-error)\n%s", e.what() );
             }
+        } catch( const JsonError &e ) {
+            debugmsg( "(json-error)\n%s", e.what() );
         }
         mark_visited( skipped_member_idx );
     }

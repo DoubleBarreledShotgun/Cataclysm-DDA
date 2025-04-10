@@ -1,7 +1,31 @@
+#include <algorithm>
+#include <map>
+#include <memory>
+#include <optional>
+#include <ostream>
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "calendar.h"
+#include "cata_utility.h"
 #include "character.h"
+#include "color.h"
+#include "cursesdef.h"
+#include "debug.h"
+#include "input_context.h"
+#include "memory_fast.h"
 #include "output.h"
+#include "point.h"
 #include "proficiency.h"
+#include "string_formatter.h"
 #include "string_input_popup.h"
+#include "translation.h"
+#include "translations.h"
+#include "type_id.h"
+#include "uilist.h"
 #include "ui_manager.h"
 
 // Basic layout:
@@ -58,7 +82,7 @@ struct prof_window {
     void draw_header();
     void draw_profs();
     void draw_details();
-    void run();
+    void run( std::optional<proficiency_id> default_selection = std::nullopt );
 };
 
 std::vector<display_prof_deps *> &prof_window::get_current_set()
@@ -246,17 +270,15 @@ void prof_window::draw_borders()
     const int h = catacurses::getmaxy( w_border );
     draw_border( w_border, c_white, _( "Proficiencies" ), c_yellow );
     // horizontal header separator
-    for( int i = 1; i < w - 1; i++ ) {
-        mvwputch( w_border, point( i, 4 ), c_white, LINE_OXOX );
-    }
-    mvwputch( w_border, point( 0, 4 ), c_white, LINE_XXXO );
-    mvwputch( w_border, point( w - 1, 4 ), c_white, LINE_XOXX );
+    wattron( w_border, c_white );
+    mvwhline( w_border, point( 1, 4 ), LINE_OXOX, w - 2 );
+    mvwaddch( w_border, point( 0, 4 ), LINE_XXXO );
+    mvwaddch( w_border, point( w - 1, 4 ), LINE_XOXX );
     // vertical column separator
-    for( int i = 5; i < h - 1; i++ ) {
-        mvwputch( w_border, point( column_width + 1, i ), c_white, LINE_XOXO );
-    }
-    mvwputch( w_border, point( column_width + 1, 4 ), c_white, LINE_OXXX );
-    mvwputch( w_border, point( column_width + 1, h - 1 ), c_white, LINE_XXOX );
+    mvwvline( w_border, point( column_width + 1, 5 ), LINE_XOXO, h - 6 );
+    mvwaddch( w_border, point( column_width + 1, 4 ), LINE_OXXX );
+    mvwaddch( w_border, point( column_width + 1, h - 1 ), LINE_XXOX );
+    wattroff( w_border, c_white );
 
     scrollbar()
     .border_color( c_white )
@@ -306,7 +328,7 @@ shared_ptr_fast<ui_adaptor> prof_window::create_or_get_ui_adaptor()
     return current_ui;
 }
 
-void prof_window::run()
+void prof_window::run( std::optional<proficiency_id> default_selection )
 {
     if( !u ) {
         return;
@@ -325,6 +347,16 @@ void prof_window::run()
 
     populate_categories();
     shared_ptr_fast<ui_adaptor> current_ui = create_or_get_ui_adaptor();
+
+    if( default_selection ) {
+        std::vector<display_prof_deps *> &cur_set = get_current_set();
+        for( int i = 0; i < static_cast<int>( cur_set.size() ); i++ ) {
+            if( cur_set[i]->first.id == default_selection.value() ) {
+                sel_prof = i;
+                break;
+            }
+        }
+    }
 
     bool done = false;
     while( !done ) {
@@ -387,8 +419,9 @@ void prof_window::run()
     }
 }
 
-void show_proficiencies_window( const Character &u )
+void show_proficiencies_window( const Character &u,
+                                std::optional<proficiency_id> default_selection )
 {
     prof_window w( &u );
-    w.run();
+    w.run( default_selection );
 }

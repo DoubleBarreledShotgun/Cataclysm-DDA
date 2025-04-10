@@ -1,24 +1,35 @@
 #include "item_pocket.h"
 
 #include <algorithm>
-#include <cstdlib>
+#include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <utility>
 
 #include "ammo.h"
+#include "bodypart.h"
 #include "calendar.h"
+#include "cata_path.h"
 #include "cata_utility.h"
 #include "character.h"
 #include "color.h"
+#include "coordinates.h"
 #include "crafting.h"
+#include "damage.h"
 #include "debug.h"
+#include "enum_traits.h"
 #include "enums.h"
 #include "flag.h"
+#include "flexbuffer_json.h"
 #include "generic_factory.h"
 #include "handle_liquid.h"
 #include "item.h"
 #include "item_category.h"
+#include "item_contents.h"
 #include "item_factory.h"
 #include "item_location.h"
 #include "itype.h"
@@ -26,30 +37,37 @@
 #include "json_loader.h"
 #include "localized_comparator.h"
 #include "map.h"
+#include "material.h"
 #include "math_defines.h"
 #include "messages.h"
 #include "output.h"
+#include "path_info.h"
 #include "string_formatter.h"
+#include "subbodypart.h"
 #include "translations.h"
 #include "units.h"
 #include "units_utility.h"
+
+static const itype_id itype_water( "water" );
 
 namespace io
 {
 // *INDENT-OFF*
 template<>
-std::string enum_to_string<item_pocket::pocket_type>( item_pocket::pocket_type data )
+std::string enum_to_string<pocket_type>( pocket_type data )
 {
     switch ( data ) {
-    case item_pocket::pocket_type::CONTAINER: return "CONTAINER";
-    case item_pocket::pocket_type::MAGAZINE: return "MAGAZINE";
-    case item_pocket::pocket_type::MAGAZINE_WELL: return "MAGAZINE_WELL";
-    case item_pocket::pocket_type::MOD: return "MOD";
-    case item_pocket::pocket_type::CORPSE: return "CORPSE";
-    case item_pocket::pocket_type::SOFTWARE: return "SOFTWARE";
-    case item_pocket::pocket_type::EBOOK: return "EBOOK";
-    case item_pocket::pocket_type::MIGRATION: return "MIGRATION";
-    case item_pocket::pocket_type::LAST: break;
+    case pocket_type::CONTAINER: return "CONTAINER";
+    case pocket_type::MAGAZINE: return "MAGAZINE";
+    case pocket_type::MAGAZINE_WELL: return "MAGAZINE_WELL";
+    case pocket_type::MOD: return "MOD";
+    case pocket_type::CORPSE: return "CORPSE";
+    case pocket_type::SOFTWARE: return "SOFTWARE";
+    case pocket_type::EBOOK: return "EBOOK";
+    case pocket_type::CABLE: return "CABLE";
+    case pocket_type::MIGRATION: return "MIGRATION";
+    case pocket_type::E_FILE_STORAGE: return "E_FILE_STORAGE";
+    case pocket_type::LAST: break;
     }
     cata_fatal( "Invalid valid_target" );
 }
@@ -60,9 +78,9 @@ std::vector<item_pocket::favorite_settings> item_pocket::pocket_presets;
 
 std::string pocket_data::check_definition() const
 {
-    if( type == item_pocket::pocket_type::MOD ||
-        type == item_pocket::pocket_type::CORPSE ||
-        type == item_pocket::pocket_type::MIGRATION ) {
+    if( type == pocket_type::MOD ||
+        type == pocket_type::CORPSE ||
+        type == pocket_type::MIGRATION ) {
         return "";
     }
     for( const itype_id &it : item_id_restriction ) {
@@ -117,7 +135,7 @@ std::string pocket_data::check_definition() const
 
 void pocket_data::load( const JsonObject &jo )
 {
-    optional( jo, was_loaded, "pocket_type", type, item_pocket::pocket_type::CONTAINER );
+    optional( jo, was_loaded, "pocket_type", type, pocket_type::CONTAINER );
     optional( jo, was_loaded, "ammo_restriction", ammo_restriction );
     optional( jo, was_loaded, "flag_restriction", flag_restrictions );
     optional( jo, was_loaded, "item_restriction", item_id_restriction );
@@ -176,6 +194,7 @@ void pocket_data::load( const JsonObject &jo )
     optional( jo, was_loaded, "holster", holster );
     optional( jo, was_loaded, "ablative", ablative );
     optional( jo, was_loaded, "inherits_flags", inherits_flags );
+    optional( jo, was_loaded, "ememory_max", ememory_max );
     // if ablative also flag as a holster so it only holds 1 item
     if( ablative ) {
         holster = true;
@@ -206,6 +225,9 @@ bool pocket_data::operator==( const pocket_data &rhs ) const
            airtight == rhs.airtight &&
            fire_protection == rhs.fire_protection &&
            get_flag_restrictions() == rhs.get_flag_restrictions() &&
+           ammo_restriction == rhs.ammo_restriction &&
+           item_id_restriction == rhs.item_id_restriction &&
+           material_restriction == rhs.material_restriction &&
            type == rhs.type &&
            volume_capacity == rhs.volume_capacity &&
            min_item_volume == rhs.min_item_volume &&
@@ -244,7 +266,7 @@ void item_pocket::restack()
     if( contents.size() <= 1 ) {
         return;
     }
-    if( is_type( item_pocket::pocket_type::MAGAZINE ) ) {
+    if( is_type( pocket_type::MAGAZINE ) ) {
         // Restack magazine contents in a way that preserves order of items
         for( auto iter = contents.begin(); iter != contents.end(); ) {
             if( !iter->count_by_charges() ) {
@@ -262,22 +284,22 @@ void item_pocket::restack()
                 ++iter;
             }
         }
-    } else {
-        for( auto outer_iter = contents.begin(); outer_iter != contents.end(); ++outer_iter ) {
-            if( !outer_iter->count_by_charges() ) {
+        return;
+    }
+    for( auto outer_iter = contents.begin(); outer_iter != contents.end(); ++outer_iter ) {
+        if( !outer_iter->count_by_charges() ) {
+            continue;
+        }
+        for( auto inner_iter = contents.begin(); inner_iter != contents.end(); ) {
+            if( outer_iter == inner_iter || !inner_iter->count_by_charges() ) {
+                ++inner_iter;
                 continue;
             }
-            for( auto inner_iter = contents.begin(); inner_iter != contents.end(); ) {
-                if( outer_iter == inner_iter || !inner_iter->count_by_charges() ) {
-                    ++inner_iter;
-                    continue;
-                }
-                if( outer_iter->combine( *inner_iter ) ) {
-                    inner_iter = contents.erase( inner_iter );
-                    outer_iter = contents.begin();
-                } else {
-                    ++inner_iter;
-                }
+            if( outer_iter->combine( *inner_iter ) ) {
+                inner_iter = contents.erase( inner_iter );
+                outer_iter = contents.begin();
+            } else {
+                ++inner_iter;
             }
         }
     }
@@ -287,6 +309,30 @@ item *item_pocket::restack( /*const*/ item *it )
 {
     item *ret = it;
     if( contents.size() <= 1 ) {
+        return ret;
+    }
+    if( is_type( pocket_type::MAGAZINE ) ) {
+        // Restack magazine contents in a way that preserves order of items
+        for( auto iter = contents.begin(); iter != contents.end(); ) {
+            if( !iter->count_by_charges() ) {
+                continue;
+            }
+
+            auto next = std::next( iter, 1 );
+            if( next == contents.end() ) {
+                break;
+            }
+
+            if( iter->combine( *next ) ) {
+                // next was placed in iter, check if next was the item that we track
+                if( &( *next ) == ret ) {
+                    ret = &( *iter );
+                }
+                iter = contents.erase( next );
+            } else {
+                ++iter;
+            }
+        }
         return ret;
     }
     for( auto outer_iter = contents.begin(); outer_iter != contents.end(); ++outer_iter ) {
@@ -382,14 +428,14 @@ bool item_pocket::better_pocket( const item_pocket &rhs, const item &it, bool ne
         return false;
     }
 
-    if( rhs.data->extra_encumbrance < data->extra_encumbrance ) {
+    if( rhs.data->extra_encumbrance != data->extra_encumbrance ) {
         // pockets with less extra encumbrance should be prioritized
-        return true;
+        return rhs.data->extra_encumbrance < data->extra_encumbrance;
     }
 
-    if( data->ripoff > rhs.data->ripoff ) {
+    if( data->ripoff != rhs.data->ripoff ) {
         // pockets without ripoff chance should be prioritized
-        return true;
+        return rhs.data->ripoff < data->ripoff;
     }
 
     if( data->rigid != rhs.data->rigid ) {
@@ -414,7 +460,7 @@ bool item_pocket::stacks_with( const item_pocket &rhs, int depth, int maxdepth )
             rhs.contents.begin(), rhs.contents.end(),
     [depth, maxdepth]( const item & a, const item & b ) {
         return depth < maxdepth && a.charges == b.charges &&
-               a.stacks_with( b, false, false, depth + 1, maxdepth );
+               a.stacks_with( b, false, false, false, depth + 1, maxdepth );
     } );
 }
 
@@ -423,7 +469,7 @@ bool item_pocket::is_funnel_container( units::volume &bigger_than ) const
     // should not be static, since after reloading some members of the item objects,
     // such as item types, may be invalidated.
     const std::vector<item> allowed_liquids{
-        item( "water", calendar::turn_zero, 1 ),
+        item( itype_water, calendar::turn_zero, 1 ),
     };
     if( !data->watertight ) {
         return false;
@@ -463,7 +509,7 @@ std::list<const item *> item_pocket::all_items_top() const
     return items;
 }
 
-std::list<item *> item_pocket::all_items_ptr( item_pocket::pocket_type pk_type )
+std::list<item *> item_pocket::all_items_ptr( pocket_type pk_type )
 {
     if( !is_type( pk_type ) ) {
         return std::list<item *>();
@@ -477,7 +523,7 @@ std::list<item *> item_pocket::all_items_ptr( item_pocket::pocket_type pk_type )
     return all_items_top_level;
 }
 
-std::list<const item *> item_pocket::all_items_ptr( item_pocket::pocket_type pk_type ) const
+std::list<const item *> item_pocket::all_items_ptr( pocket_type pk_type ) const
 {
     if( !is_type( pk_type ) ) {
         return std::list<const item *>();
@@ -566,7 +612,10 @@ int item_pocket::remaining_capacity_for_item( const item &it ) const
             return 0;
         }
     } else if( can_contain( it ).success() ) {
-        return 1;
+        return std::min( {
+            charges_per_remaining_volume( it ),
+            charges_per_remaining_weight( it )
+        } );
     } else {
         return 0;
     }
@@ -579,7 +628,7 @@ units::volume item_pocket::item_size_modifier() const
     }
     units::volume total_vol = 0_ml;
     for( const item &it : contents ) {
-        total_vol += it.volume( is_type( item_pocket::pocket_type::MOD ) );
+        total_vol += it.volume( is_type( pocket_type::MOD ) );
     }
     total_vol -= data->magazine_well;
     total_vol *= data->volume_multiplier;
@@ -590,7 +639,7 @@ units::mass item_pocket::item_weight_modifier() const
 {
     units::mass total_mass = 0_gram;
     for( const item &it : contents ) {
-        if( is_type( item_pocket::pocket_type::MOD ) ) {
+        if( is_type( pocket_type::MOD ) ) {
             total_mass += it.weight( true, true ) * data->weight_multiplier;
         } else {
             total_mass += it.weight() * data->weight_multiplier;
@@ -601,7 +650,7 @@ units::mass item_pocket::item_weight_modifier() const
 
 units::length item_pocket::item_length_modifier() const
 {
-    if( is_type( item_pocket::pocket_type::EBOOK ) ) {
+    if( is_type( pocket_type::E_FILE_STORAGE ) ) {
         return 0_mm;
     }
     units::length total_length = 0_mm;
@@ -668,7 +717,7 @@ item *item_pocket::magazine_current()
 
 itype_id item_pocket::magazine_default() const
 {
-    if( is_type( item_pocket::pocket_type::MAGAZINE_WELL ) ) {
+    if( is_type( pocket_type::MAGAZINE_WELL ) ) {
         return data->default_magazine;
     }
     return itype_id::NULL_ID();
@@ -753,7 +802,7 @@ void item_pocket::casings_handle( const std::function<bool( item & )> &func )
 void item_pocket::handle_liquid_or_spill( Character &guy, const item *avoid )
 {
     if( guy.is_npc() ) {
-        spill_contents( guy.pos() );
+        spill_contents( guy.pos_bub() );
         return;
     }
 
@@ -771,6 +820,8 @@ void item_pocket::handle_liquid_or_spill( Character &guy, const item *avoid )
             item i_copy( *iter );
             guy.i_add_or_drop( i_copy, 1, avoid, &*iter );
             iter = contents.erase( iter );
+            guy.add_msg_if_player( m_warning, _( "The %s falls out of the %s." ), i_copy.display_name(),
+                                   get_name() );
         }
     }
 }
@@ -853,7 +904,7 @@ std::string item_pocket::translated_sealed_prefix() const
     }
 }
 
-bool item_pocket::detonate( const tripoint &pos, std::vector<item> &drops )
+bool item_pocket::detonate( const tripoint_bub_ms &pos, std::vector<item> &drops )
 {
     const auto new_end = std::remove_if( contents.begin(), contents.end(), [&pos, &drops]( item & it ) {
         return it.detonate( pos, drops );
@@ -866,26 +917,6 @@ bool item_pocket::detonate( const tripoint &pos, std::vector<item> &drops )
     return false;
 }
 
-bool item_pocket::process( const itype &type, map &here, Character *carrier, const tripoint &pos,
-                           float insulation, const temperature_flag flag )
-{
-    bool processed = false;
-    float spoil_multiplier = 1.0f;
-    for( auto it = contents.begin(); it != contents.end(); ) {
-        if( _sealed ) {
-            spoil_multiplier = 0.0f;
-        }
-        if( it->process( here, carrier, pos, type.insulation_factor * insulation, flag,
-                         spoil_multiplier ) ) {
-            it->spill_contents( pos );
-            it = contents.erase( it );
-            processed = true;
-        } else {
-            ++it;
-        }
-    }
-    return processed;
-}
 
 void item_pocket::remove_all_ammo( Character &guy )
 {
@@ -909,6 +940,7 @@ void item_pocket::remove_all_mods( Character &guy )
             ++iter;
         }
     }
+    on_contents_changed();
 }
 
 void item_pocket::set_item_defaults()
@@ -1121,6 +1153,16 @@ void item_pocket::general_info( std::vector<iteminfo> &info, int pocket_number,
             }
         }
     }
+    if( !no_rigid.empty() ) {
+        std::vector<sub_bodypart_id> no_rigid_vec( no_rigid.begin(), no_rigid.end() );
+        std::set<translation, localized_comparator> to_print = body_part_type::consolidate( no_rigid_vec );
+        std::string bps = enumerate_as_string( to_print.begin(),
+        to_print.end(), []( const translation & t ) {
+            return t.translated();
+        } );
+        info.emplace_back( "DESCRIPTION", string_format( _( "<bold>Can't put hard armor on: %s</bold>:" ),
+                           bps ) );
+    }
 }
 
 void item_pocket::contents_info( std::vector<iteminfo> &info, int pocket_number,
@@ -1184,7 +1226,8 @@ void item_pocket::contents_info( std::vector<iteminfo> &info, int pocket_number,
             const std::vector<damage_info_order> &all_ablate = damage_info_order::get_all(
                         damage_info_order::info_type::ABLATE );
             for( const damage_info_order &dio : all_ablate ) {
-                std::string label = string_format( idx == 0 ? _( "<bold>Protection</bold>: %s: " ) : "%s: ",
+                std::string label = string_format( idx == 0 ? _( "<bold>Protection</bold>: %s: " ) :
+                                                   pgettext( "protection info", " %s: " ),
                                                    uppercase_first_letter( dio.dmg_type->name.translated() ) );
                 iteminfo::flags flgs = idx == all_ablate.size() - 1 ?
                                        iteminfo::is_decimal : iteminfo::no_newline | iteminfo::is_decimal;
@@ -1203,6 +1246,7 @@ void item_pocket::contents_info( std::vector<iteminfo> &info, int pocket_number,
                                            contains_weight() ) );
         info.emplace_back( weight_to_info( cont_type_str, _( " of " ),
                                            weight_capacity() ) );
+        info.back().bNewLine = true;
     } else {
         // With ammo_restriction, total capacity does not matter, but show current volume/weight
         info.emplace_back( vol_to_info( cont_type_str, _( "Volume: " ),
@@ -1212,44 +1256,41 @@ void item_pocket::contents_info( std::vector<iteminfo> &info, int pocket_number,
                                            contains_weight() ) );
     }
 
+    if( remaining_volume() < 0_ml || remaining_weight() < 0_gram ) {
+        info.emplace_back( "DESCRIPTION",
+                           colorize( _( "This pocket is over capacity and will spill if moved!" ), c_red ) );
+    }
+
     // ablative pockets have their contents displayed earlier in the UI
     if( !is_ablative() ) {
-        std::vector<std::pair<item const *, int>> counted_contents;
+        std::vector<std::pair<const item *, int>> counted_contents = get_item_duplicate_counts(
+                all_items_top() );
         bool contents_header = false;
-        for( const item &contents_item : contents ) {
+
+        for( std::pair<item const *, int> content : counted_contents ) {
+            const item *contents_item = content.first;
+            const int count = content.second;
+
             if( !contents_header ) {
                 info.emplace_back( "DESCRIPTION", _( "<bold>Contents of this pocket</bold>:" ) );
                 contents_header = true;
             }
 
-            const translation &desc = contents_item.type->description;
+            const translation &desc = contents_item->type->description;
 
-            if( contents_item.made_of_from_type( phase_id::LIQUID ) ) {
-                info.emplace_back( "DESCRIPTION", colorize( space + contents_item.display_name(),
-                                   contents_item.color_in_inventory() ) );
-                info.emplace_back( vol_to_info( cont_type_str, desc + space, contents_item.volume() ) );
-            } else {
-                bool found = false;
-                for( std::pair<item const *, int> &content : counted_contents ) {
-                    if( content.first->display_stacked_with( contents_item ) ) {
-                        content.second += 1;
-                        found = true;
-                    }
-                }
-                if( !found ) {
-                    std::pair<item const *, int> new_content( &contents_item, 1 );
-                    counted_contents.push_back( new_content );
-                }
-            }
-        }
-        for( std::pair<item const *, int> content : counted_contents ) {
-            if( content.second > 1 ) {
+            if( contents_item->made_of_from_type( phase_id::LIQUID ) ) {
                 info.emplace_back( "DESCRIPTION",
-                                   space + std::to_string( content.second ) + " " + colorize( content.first->display_name(
-                                               content.second ), content.first->color_in_inventory() ) );
+                                   colorize( space + contents_item->display_name(), contents_item->color_in_inventory() ) );
+                info.emplace_back( vol_to_info( cont_type_str, desc + space, contents_item->volume() ) );
             } else {
-                info.emplace_back( "DESCRIPTION", space + colorize( content.first->display_name(),
-                                   content.first->color_in_inventory() ) );
+                if( count > 1 ) {
+                    info.emplace_back( "DESCRIPTION",
+                                       space + std::to_string( count ) + " " + colorize( contents_item->display_name(
+                                                   count ), contents_item->color_in_inventory() ) );
+                } else {
+                    info.emplace_back( "DESCRIPTION",
+                                       space + colorize( contents_item->display_name(), contents_item->color_in_inventory() ) );
+                }
             }
         }
     }
@@ -1282,33 +1323,46 @@ static int charges_per_volume_recursive( const units::volume &max_item_volume,
 
 ret_val<item_pocket::contain_code> item_pocket::is_compatible( const item &it ) const
 {
-    if( it.has_flag( flag_NO_UNWIELD ) ) {
-        return ret_val<item_pocket::contain_code>::make_failure(
-                   contain_code::ERR_MOD, _( "cannot unwield item" ) );
-    }
-
-    if( data->type == item_pocket::pocket_type::CORPSE ) {
-        // corpses can't have items stored in them the normal way,
-        // we simply don't want them to "spill"
+    if( data->type == pocket_type::MIGRATION ) {
+        // migration pockets need to always succeed
         return ret_val<item_pocket::contain_code>::make_success();
     }
 
-    if( data->type == item_pocket::pocket_type::EBOOK ) {
-        if( it.is_book() ) {
-            return ret_val<item_pocket::contain_code>::make_success();
-        } else {
-            return ret_val<item_pocket::contain_code>::make_failure(
-                       contain_code::ERR_MOD, _( "only books can go into ebook pocket" ) );
-        }
-    }
-
-    if( data->type == item_pocket::pocket_type::MOD ) {
+    if( data->type == pocket_type::MOD ) {
         if( it.is_toolmod() || it.is_gunmod() ) {
             return ret_val<item_pocket::contain_code>::make_success();
         } else {
             return ret_val<item_pocket::contain_code>::make_failure(
                        contain_code::ERR_MOD, _( "only mods can go into mod pocket" ) );
         }
+    }
+
+    if( data->type == pocket_type::CORPSE ) {
+        // corpses can't have items stored in them the normal way,
+        // we simply don't want them to "spill"
+        return ret_val<item_pocket::contain_code>::make_success();
+    }
+    if( data->type == pocket_type::E_FILE_STORAGE ) {
+        if( it.is_estorable() ) {
+            return ret_val<item_pocket::contain_code>::make_success();
+        } else {
+            return ret_val<item_pocket::contain_code>::make_failure(
+                       contain_code::ERR_MOD, _( "only books, e-scannable items can go into e-file pocket" ) );
+        }
+    }
+
+    if( data->type == pocket_type::CABLE ) {
+        if( it.has_flag( flag_CABLE_SPOOL ) ) {
+            return ret_val<item_pocket::contain_code>::make_success();
+        } else {
+            return ret_val<item_pocket::contain_code>::make_failure(
+                       contain_code::ERR_MOD, _( "only cables can go into cable pocket" ) );
+        }
+    }
+
+    if( it.has_flag( flag_NO_UNWIELD ) ) {
+        return ret_val<item_pocket::contain_code>::make_failure(
+                   contain_code::ERR_MOD, _( "cannot unwield item" ) );
     }
 
     if( !data->item_id_restriction.empty() || !data->get_flag_restrictions().empty() ||
@@ -1325,7 +1379,7 @@ ret_val<item_pocket::contain_code> item_pocket::is_compatible( const item &it ) 
     if( !data->ammo_restriction.empty() ) {
         if( !it.is_ammo() ) {
             return ret_val<item_pocket::contain_code>::make_failure(
-                       contain_code::ERR_AMMO, _( "item is not an ammo" ) );
+                       contain_code::ERR_AMMO, _( "item is not ammunition" ) );
         }
 
         const auto ammo_restriction_iter = data->ammo_restriction.find( it.ammo_type() );
@@ -1358,7 +1412,7 @@ ret_val<item_pocket::contain_code> item_pocket::is_compatible( const item &it ) 
         !it.is_frozen_liquid() && data->max_item_volume &&
         !charges_per_volume_recursive( *data->max_item_volume, it ) ) {
         return ret_val<item_pocket::contain_code>::make_failure(
-                   contain_code::ERR_TOO_BIG, _( "item too big" ) );
+                   contain_code::ERR_TOO_BIG, _( "item is too big" ) );
     }
     if( it.length() > data->max_item_length ) {
         return ret_val<item_pocket::contain_code>::make_failure(
@@ -1377,51 +1431,39 @@ ret_val<item_pocket::contain_code> item_pocket::is_compatible( const item &it ) 
     return ret_val<item_pocket::contain_code>::make_success();
 }
 
-ret_val<item_pocket::contain_code> item_pocket::can_contain( const item &it ) const
+ret_val<item_pocket::contain_code> item_pocket::can_contain( const item &it,
+        int &copies_remaining, bool ignore_contents ) const
+{
+    return _can_contain( it, copies_remaining, ignore_contents );
+}
+
+ret_val<item_pocket::contain_code> item_pocket::can_contain( const item &it,
+        bool ignore_contents ) const
+{
+    int copies = 1;
+    return _can_contain( it, copies, ignore_contents );
+}
+
+ret_val<item_pocket::contain_code> item_pocket::_can_contain( const item &it,
+        int &copies_remaining, const bool ignore_contents ) const
 {
     ret_val<item_pocket::contain_code> compatible = is_compatible( it );
 
-    if( data->type == item_pocket::pocket_type::CORPSE ) {
-        // corpses can't have items stored in them the normal way,
-        // we simply don't want them to "spill"
+    if( copies_remaining <= 0 ) {
         return ret_val<item_pocket::contain_code>::make_success();
     }
     // To prevent debugmsg. Casings can only be inserted in a magazine during firing.
-    if( data->type == item_pocket::pocket_type::MAGAZINE && it.has_flag( flag_CASING ) ) {
+    if( data->type == pocket_type::MAGAZINE && it.has_flag( flag_CASING ) ) {
+        copies_remaining = 0;
         return ret_val<item_pocket::contain_code>::make_success();
     }
 
     if( !compatible.success() ) {
         return compatible;
     }
-
-    if( data->type == item_pocket::pocket_type::MAGAZINE && !empty() ) {
-        for( const item &contained : contents ) {
-            if( contained.has_flag( flag_CASING ) ) {
-                continue;
-            } else if( contained.ammo_type() != it.ammo_type() ) {
-                return ret_val<item_pocket::contain_code>::make_failure(
-                           contain_code::ERR_NO_SPACE, _( "can't mix different ammo" ) );
-            }
-        }
-    }
-
-    if( data->ablative && !contents.empty() ) {
-        if( contents.front().can_combine( it ) ) {
-            return ret_val<item_pocket::contain_code>::make_success();
-        } else {
-            return ret_val<item_pocket::contain_code>::make_failure(
-                       contain_code::ERR_NO_SPACE, _( "ablative pocket already contains a plate" ) );
-        }
-    }
-
-    if( data->holster && !contents.empty() ) {
-        if( contents.front().can_combine( it ) ) {
-            return ret_val<item_pocket::contain_code>::make_success();
-        } else {
-            return ret_val<item_pocket::contain_code>::make_failure(
-                       contain_code::ERR_NO_SPACE, _( "holster already contains an item" ) );
-        }
+    if( !is_standard_type() ) {
+        copies_remaining = 0;
+        return ret_val<item_pocket::contain_code>::make_success();
     }
 
     if( it.made_of( phase_id::LIQUID ) ) {
@@ -1459,6 +1501,64 @@ ret_val<item_pocket::contain_code> item_pocket::can_contain( const item &it ) co
                    contain_code::ERR_GAS, _( "can't put non gas into pocket with gas" ) );
     }
 
+    if( ignore_contents ) {
+        // Skip all the checks against other pocket contents.
+        if( it.weight() > weight_capacity() ) {
+            return ret_val<item_pocket::contain_code>::make_failure(
+                       contain_code::ERR_TOO_HEAVY, _( "item is too heavy" ) );
+        }
+        if( it.volume() > volume_capacity() ) {
+            return ret_val<item_pocket::contain_code>::make_failure(
+                       contain_code::ERR_TOO_BIG, _( "item is too big" ) );
+        }
+        return ret_val<item_pocket::contain_code>::make_success();
+    }
+
+    if( data->type == pocket_type::MAGAZINE && !empty() ) {
+        for( const item &contained : contents ) {
+            if( contained.has_flag( flag_CASING ) ) {
+                continue;
+            } else if( contained.ammo_type() != it.ammo_type() ) {
+                return ret_val<item_pocket::contain_code>::make_failure(
+                           contain_code::ERR_NO_SPACE, _( "can't mix different ammo" ) );
+            }
+        }
+    }
+
+    if( data->ablative ) {
+        if( !contents.empty() ) {
+            if( contents.front().can_combine( it ) ) {
+                // Only items with charges can succeed here.
+                return ret_val<item_pocket::contain_code>::make_success();
+            } else {
+                return ret_val<item_pocket::contain_code>::make_failure(
+                           contain_code::ERR_NO_SPACE, _( "ablative pocket already contains a plate" ) );
+            }
+        }
+
+        if( it.is_rigid() ) {
+            for( const sub_bodypart_id &sbp : it.get_covered_sub_body_parts() ) {
+                if( it.is_bp_rigid( sbp ) && std::count( no_rigid.begin(), no_rigid.end(), sbp ) != 0 ) {
+                    return ret_val<item_pocket::contain_code>::make_failure(
+                               contain_code::ERR_NO_SPACE,
+                               _( "ablative pocket is being worn with hard armor can't support hard plate" ) );
+                }
+            }
+        }
+        copies_remaining = std::max( 0, copies_remaining - 1 );
+        return ret_val<item_pocket::contain_code>::make_success();
+    }
+
+    if( data->holster && !contents.empty() ) {
+        if( contents.front().can_combine( it ) ) {
+            // Only items with charges can succeed here.
+            return ret_val<item_pocket::contain_code>::make_success();
+        } else {
+            return ret_val<item_pocket::contain_code>::make_failure(
+                       contain_code::ERR_NO_SPACE, _( "holster already contains an item" ) );
+        }
+    }
+
     if( !data->ammo_restriction.empty() ) {
         const ammotype it_ammo = it.ammo_type();
         if( it.count() > remaining_ammo_capacity( it_ammo ) ) {
@@ -1466,25 +1566,43 @@ ret_val<item_pocket::contain_code> item_pocket::can_contain( const item &it ) co
                        contain_code::ERR_NO_SPACE, _( "tried to put too many charges of ammo in item" ) );
         }
         // ammo restriction overrides item volume/weight and watertight/airtight data
+        copies_remaining = std::max( 0, copies_remaining - remaining_ammo_capacity( it_ammo ) );
         return ret_val<item_pocket::contain_code>::make_success();
     }
 
-    if( it.weight() > weight_capacity() ) {
+    units::mass weight = it.weight();
+    if( weight > weight_capacity() ) {
         return ret_val<item_pocket::contain_code>::make_failure(
                    contain_code::ERR_TOO_HEAVY, _( "item is too heavy" ) );
     }
-    if( it.weight() > 0_gram && charges_per_remaining_weight( it ) < it.count() ) {
+    units::volume volume = it.volume();
+    if( volume > volume_capacity() ) {
+        return ret_val<item_pocket::contain_code>::make_failure(
+                   contain_code::ERR_TOO_BIG, _( "item is too big" ) );
+    }
+
+    int fallback_capacity = it.count_by_charges() ? it.charges : copies_remaining;
+    int copy_weight_capacity = weight <= 0_gram ? fallback_capacity :
+                               charges_per_remaining_weight( it );
+    int copy_volume_capacity = volume <= 0_ml ? fallback_capacity :
+                               charges_per_remaining_volume( it );
+
+    if( copy_weight_capacity < it.count() ) {
         return ret_val<item_pocket::contain_code>::make_failure(
                    contain_code::ERR_CANNOT_SUPPORT, _( "pocket is holding too much weight" ) );
     }
-    if( it.volume() > volume_capacity() ) {
-        return ret_val<item_pocket::contain_code>::make_failure(
-                   contain_code::ERR_TOO_BIG, _( "item too big" ) );
-    }
-    if( it.volume() > 0_ml && charges_per_remaining_volume( it ) < it.count() ) {
+    if( copy_volume_capacity < it.count() ) {
         return ret_val<item_pocket::contain_code>::make_failure(
                    contain_code::ERR_NO_SPACE, _( "not enough space" ) );
     }
+
+    if( copies_remaining > 1 ) {
+        int how_many_copies_fit = std::min( { data->holster ? 1 : copies_remaining, copy_weight_capacity, copy_volume_capacity } );
+        copies_remaining -= how_many_copies_fit;
+    } else {
+        copies_remaining = 0;
+    }
+
     return ret_val<item_pocket::contain_code>::make_success();
 }
 
@@ -1507,7 +1625,7 @@ bool item_pocket::contains_phase( phase_id phase ) const
 
 bool item_pocket::can_reload_with( const item &ammo, const bool now ) const
 {
-    if( is_type( item_pocket::pocket_type::CONTAINER ) ) {
+    if( is_type( pocket_type::CONTAINER ) ) {
         // Only watertight container pockets are reloadable
         if( !watertight() ) {
             return false;
@@ -1525,7 +1643,7 @@ bool item_pocket::can_reload_with( const item &ammo, const bool now ) const
         // and the opcket needs to have enough space (except casings)
         return allows_speedloader( ammo.typeId() ) &&
                is_compatible( ammo.loaded_ammo() ).success() &&
-               ( remaining_ammo_capacity( ammo.loaded_ammo().ammo_type() ) >= ammo.ammo_remaining() );
+               ( remaining_ammo_capacity( ammo.loaded_ammo().ammo_type() ) >= ammo.ammo_remaining( ) );
     }
 
     if( ammo.has_flag( flag_SPEEDLOADER_CLIP ) ) {
@@ -1552,7 +1670,7 @@ bool item_pocket::can_reload_with( const item &ammo, const bool now ) const
             return true;
         }
 
-        if( is_type( item_pocket::pocket_type::MAGAZINE ) ) {
+        if( is_type( pocket_type::MAGAZINE ) ) {
             // Reloading is refused if
             // Pocket is full of ammo (casings are ignored)
             // Ammos are of different ammo type
@@ -1580,14 +1698,14 @@ bool item_pocket::can_reload_with( const item &ammo, const bool now ) const
 
             return true;
 
-        } else if( is_type( item_pocket::pocket_type::MAGAZINE_WELL ) ) {
+        } else if( is_type( pocket_type::MAGAZINE_WELL ) ) {
             // Reloading is refused if there already is full magazine here
             // Reloading with another identical mag with identical contents is also pointless so it is not allowed
             // Pocket can't know what ammo are compatible with the item so that is checked elsewhere
 
             return !front().is_magazine_full() && !( front().typeId() == ammo.typeId() &&
                     front().same_contents( ammo ) );
-        } else if( is_type( item_pocket::pocket_type::CONTAINER ) ) {
+        } else if( is_type( pocket_type::CONTAINER ) ) {
             // Reloading is possible if liquid combines with old liquid
 
             if( front().can_combine( ammo ) ) {
@@ -1637,10 +1755,43 @@ std::optional<item> item_pocket::remove_item( const item_location &it )
     return remove_item( *it );
 }
 
-void item_pocket::overflow( const tripoint &pos )
+static void move_to_parent_pocket_recursive( map &here, const tripoint_bub_ms &pos, item &it,
+        const item_location &loc, Character *carrier )
+{
+    if( loc ) {
+        item_pocket *parent_pocket = loc.parent_pocket();
+        if( parent_pocket && parent_pocket->can_contain( it ).success() ) {
+            if( carrier ) {
+                carrier->add_msg_if_player( m_bad, _( "Your %1$s falls into your %2$s." ),
+                                            it.display_name(), loc.parent_item()->label( 1 ) );
+            }
+            parent_pocket->insert_item( it );
+            return;
+        }
+        if( loc.where() == item_location::type::container ) {
+            move_to_parent_pocket_recursive( here, pos, it, loc.parent_item(), carrier );
+            return;
+        }
+    }
+
+    if( carrier ) {
+        carrier->invalidate_weight_carried_cache();
+        carrier->add_msg_player_or_npc( m_bad, _( "Your %s falls to the ground." ),
+                                        _( "<npcname>'s %s falls to the ground." ), it.display_name() );
+    } else {
+        // TODO: Make operation map aware.
+        add_msg_if_player_sees( reality_bubble().get_bub( here.get_abs( pos ) ), m_bad,
+                                _( "The %s falls to the ground." ),
+                                it.display_name() );
+    }
+    here.add_item_or_charges( pos, it );
+}
+
+void item_pocket::overflow( map &here, const tripoint_bub_ms &pos, const item_location &loc )
 {
     if( is_type( pocket_type::MOD ) || is_type( pocket_type::CORPSE ) ||
-        is_type( pocket_type::EBOOK ) ) {
+        is_type( pocket_type::CABLE ) ||
+        is_type( pocket_type::E_FILE_STORAGE ) ) {
         return;
     }
     if( empty() ) {
@@ -1650,21 +1801,42 @@ void item_pocket::overflow( const tripoint &pos )
 
     // overflow recursively
     for( item &it : contents ) {
-        it.overflow( pos );
+        if( loc ) {
+            item_location content_loc( loc, &it );
+            content_loc.overflow( here );
+        } else {
+            it.overflow( here, pos );
+        }
     }
 
-    map &here = get_map();
+    Character *carrier = loc.carrier();
+
     // first remove items that shouldn't be in there anyway
+    std::unordered_map<itype_id, bool> contained_type_validity;
     for( auto iter = contents.begin(); iter != contents.end(); ) {
-        ret_val<contain_code> ret_contain = can_contain( *iter );
-        if( is_type( pocket_type::MIGRATION ) || ( !ret_contain.success() &&
-                ret_contain.value() != contain_code::ERR_NO_SPACE &&
-                ret_contain.value() != contain_code::ERR_CANNOT_SUPPORT ) ) {
-            add_msg( m_bad, _( "Your %s falls to the ground." ), iter->tname() );
-            here.add_item_or_charges( pos, *iter );
-            iter = contents.erase( iter );
-        } else {
+
+        // if item has any contents, check it individually
+        if( !iter->get_contents().empty_with_no_mods() ) {
+            if( !is_type( pocket_type::MIGRATION ) && can_contain( *iter, true ).success() ) {
+                ++iter;
+            } else {
+                move_to_parent_pocket_recursive( here, pos, *iter, loc, carrier );
+                iter = contents.erase( iter );
+            }
+            continue;
+        }
+
+        // otherwise, use cached results per item type
+        auto cont_copy_type = contained_type_validity.emplace( iter->typeId(), true );
+        if( cont_copy_type.second ) {
+            cont_copy_type.first->second = !is_type( pocket_type::MIGRATION ) &&
+                                           can_contain( *iter, true ).success();
+        }
+        if( cont_copy_type.first->second ) {
             ++iter;
+        } else {
+            move_to_parent_pocket_recursive( here, pos, *iter, loc, carrier );
+            iter = contents.erase( iter );
         }
     }
 
@@ -1679,7 +1851,7 @@ void item_pocket::overflow( const tripoint &pos )
         if( ammo_iter == data->ammo_restriction.end() ) {
             // only one ammotype is allowed in an ammo restricted pocket
             // so if the first one is wrong, they're all wrong
-            spill_contents( pos );
+            spill_contents( &here, pos );
             return;
         }
         int total_qty = 0;
@@ -1690,8 +1862,7 @@ void item_pocket::overflow( const tripoint &pos )
             if( overflow_count > 0 ) {
                 ammo.charges -= overflow_count;
                 item dropped_ammo( ammo.typeId(), ammo.birthday(), overflow_count );
-                add_msg( m_bad, _( "Your %s falls to the ground." ), iter->tname() );
-                here.add_item_or_charges( pos, contents.front() );
+                move_to_parent_pocket_recursive( here, pos, *iter, loc, carrier );
                 total_qty -= overflow_count;
             }
             if( ammo.count() == 0 ) {
@@ -1710,8 +1881,7 @@ void item_pocket::overflow( const tripoint &pos )
             return left.volume() > right.volume();
         } );
         while( remaining_volume() < 0_ml && !contents.empty() ) {
-            add_msg( m_bad, _( "Your %s falls to the ground." ), contents.front().tname() );
-            here.add_item_or_charges( pos, contents.front() );
+            move_to_parent_pocket_recursive( here, pos, contents.front(), loc, carrier );
             contents.pop_front();
         }
     }
@@ -1720,8 +1890,7 @@ void item_pocket::overflow( const tripoint &pos )
             return left.weight() > right.weight();
         } );
         while( remaining_weight() < 0_gram && !contents.empty() ) {
-            add_msg( m_bad, _( "Your %s falls to the ground." ), contents.front().tname() );
-            here.add_item_or_charges( pos, contents.front() );
+            move_to_parent_pocket_recursive( here, pos, contents.front(), loc, carrier );
             contents.pop_front();
         }
     }
@@ -1743,15 +1912,20 @@ void item_pocket::on_contents_changed()
     restack();
 }
 
-bool item_pocket::spill_contents( const tripoint &pos )
+bool item_pocket::spill_contents( const tripoint_bub_ms &pos )
 {
-    if( is_type( pocket_type::EBOOK ) || is_type( pocket_type::CORPSE ) ) {
+    return item_pocket::spill_contents( &get_map(), pos );
+}
+
+bool item_pocket::spill_contents( map *here, const tripoint_bub_ms &pos )
+{
+    if( is_type( pocket_type::E_FILE_STORAGE ) ||
+        is_type( pocket_type::CORPSE ) || is_type( pocket_type::CABLE ) ) {
         return false;
     }
 
-    map &here = get_map();
     for( item &it : contents ) {
-        here.add_item_or_charges( pos, it );
+        here->add_item_or_charges( pos, it );
     }
 
     contents.clear();
@@ -1781,19 +1955,31 @@ item *item_pocket::get_item_with( const std::function<bool( const item & )> &fil
     return nullptr;
 }
 
+const item *item_pocket::get_item_with( const std::function<bool( const item & )> &filter ) const
+{
+    for( const item &it : contents ) {
+        if( filter( it ) ) {
+            return &it;
+        }
+    }
+    return nullptr;
+}
+
 void item_pocket::remove_items_if( const std::function<bool( item & )> &filter )
 {
     contents.remove_if( filter );
     on_contents_changed();
 }
 
-void item_pocket::process( map &here, Character *carrier, const tripoint &pos, float insulation,
-                           temperature_flag flag, float spoil_multiplier_parent )
+void item_pocket::process( map &here, Character *carrier, const tripoint_bub_ms &pos,
+                           float insulation,
+                           temperature_flag flag, float spoil_multiplier_parent, bool watertight_container )
 {
     for( auto iter = contents.begin(); iter != contents.end(); ) {
         if( iter->process( here, carrier, pos, insulation, flag,
                            // spoil multipliers on pockets are not additive or multiplicative, they choose the best
-                           std::min( spoil_multiplier_parent, spoil_multiplier() ) ) ) {
+                           std::min( spoil_multiplier_parent, spoil_multiplier() ),
+                           watertight_container || can_contain_liquid( false ) ) ) {
             iter->spill_contents( pos );
             iter = contents.erase( iter );
         } else {
@@ -1802,7 +1988,8 @@ void item_pocket::process( map &here, Character *carrier, const tripoint &pos, f
     }
 }
 
-void item_pocket::leak( map &here, Character *carrier, const tripoint &pos, item_pocket *pocke )
+void item_pocket::leak( map &here, Character *carrier, const tripoint_bub_ms &pos,
+                        item_pocket *pocke )
 {
     std::vector<item *> erases;
     for( auto iter = contents.begin(); iter != contents.end(); ) {
@@ -1823,8 +2010,11 @@ void item_pocket::leak( map &here, Character *carrier, const tripoint &pos, item
                 iter->unset_flag( flag_FROM_FROZEN_LIQUID );
                 iter->on_drop( pos );
                 here.add_item_or_charges( pos, *iter );
-                carrier->add_msg_if_player( _( "Liquid leaked out from the %s and dripped onto the ground!" ),
-                                            this->get_name() );
+                if( carrier != nullptr ) {
+                    carrier->invalidate_weight_carried_cache();
+                    carrier->add_msg_if_player( _( "Liquid leaked out from the %s and dripped onto the ground!" ),
+                                                this->get_name() );
+                }
             }
             iter = contents.erase( iter );
         } else {
@@ -1849,7 +2039,7 @@ bool item_pocket::full( bool allow_bucket ) const
         return true;
     }
 
-    if( is_type( item_pocket::pocket_type::MAGAZINE ) && !data->ammo_restriction.empty() ) {
+    if( is_type( pocket_type::MAGAZINE ) && !data->ammo_restriction.empty() ) {
         // Fullness from remaining ammo capacity instead of volume
         for( const item &it : contents ) {
             if( it.has_flag( flag_CASING ) ) {
@@ -1884,6 +2074,11 @@ bool item_pocket::is_standard_type() const
     return data->type == pocket_type::CONTAINER ||
            data->type == pocket_type::MAGAZINE ||
            data->type == pocket_type::MAGAZINE_WELL;
+}
+
+bool item_pocket::is_container_like_type() const
+{
+    return is_standard_type() || data->type == pocket_type::E_FILE_STORAGE;
 }
 
 bool item_pocket::is_forbidden() const
@@ -1922,6 +2117,13 @@ void item_pocket::add( const item &it, item **ret )
         restack();
     } else {
         *ret = restack( &contents.back() );
+    }
+}
+
+void item_pocket::add( const item &it, const int copies, std::vector<item *> &added )
+{
+    for( auto iter = contents.insert( contents.end(), copies, it ); iter != contents.end(); iter++ ) {
+        added.push_back( &*iter );
     }
 }
 
@@ -1969,7 +2171,8 @@ int item_pocket::fill_with( const item &contained, Character &guy, int amount,
     }
 
     contained_item.handle_pickup_ownership( guy );
-    if( !insert_item( contained_item ).success() ) {
+    ret_val<item *> result = insert_item( contained_item );
+    if( !result.success() ) {
         debugmsg( "charges per remaining pocket volume does not fit in that very volume" );
         return 0;
     }
@@ -1978,6 +2181,7 @@ int item_pocket::fill_with( const item &contained, Character &guy, int amount,
     if( allow_unseal ) {
         unseal();
     }
+    result.value()->on_pickup( guy );
     return num_contained;
 }
 
@@ -1986,23 +2190,27 @@ std::list<item> &item_pocket::edit_contents()
     return contents;
 }
 
-ret_val<item_pocket::contain_code> item_pocket::insert_item( const item &it,
-        const bool into_bottom, bool restack_charges )
+ret_val<item *> item_pocket::insert_item( const item &it,
+        const bool into_bottom, bool restack_charges, bool ignore_contents )
 {
-    ret_val<item_pocket::contain_code> ret = !is_standard_type() ?
-            ret_val<item_pocket::contain_code>::make_success() : can_contain( it );
+    ret_val<item_pocket::contain_code> containable = can_contain( it, ignore_contents );
 
-    if( ret.success() ) {
-        if( !into_bottom ) {
-            contents.push_front( it );
-        } else {
-            contents.push_back( it );
-        }
-        if( restack_charges ) {
-            restack();
-        }
+    if( !containable.success() ) {
+        return ret_val<item *>::make_failure( nullptr, containable.str() );
     }
-    return ret;
+
+    item *inserted = nullptr;
+    if( !into_bottom ) {
+        contents.push_front( it );
+        inserted = &contents.front();
+    } else {
+        contents.push_back( it );
+        inserted = &contents.back();
+    }
+    if( restack_charges ) {
+        inserted = restack( inserted );
+    }
+    return ret_val<item *>::make_success( inserted );
 }
 
 std::pair<item_location, item_pocket *> item_pocket::best_pocket_in_contents(
@@ -2010,12 +2218,12 @@ std::pair<item_location, item_pocket *> item_pocket::best_pocket_in_contents(
     const bool allow_sealed, const bool ignore_settings )
 {
     std::pair<item_location, item_pocket *> ret( this_loc, nullptr );
-    // If the current pocket has restrictions or blacklists the item,
+    // If the current pocket has restrictions or blacklists the item or is a holster,
     // try the nested pocket regardless of whether it's soft or rigid.
     const bool ignore_rigidity =
         !settings.accepts_item( it ) ||
         !get_pocket_data()->get_flag_restrictions().empty() ||
-        settings.priority() > 0;
+        settings.priority() > 0 || is_holster();
 
     for( item &contained_item : contents ) {
         if( &contained_item == &it || &contained_item == avoid ) {
@@ -2128,9 +2336,9 @@ int item_pocket::charges_per_remaining_volume( const item &it ) const
                 non_it_volume -= contained.volume();
             }
         }
-        return it.charges_per_volume( non_it_volume ) - contained_charges;
+        return it.charges_per_volume( non_it_volume, true ) - contained_charges;
     } else {
-        return it.charges_per_volume( remaining_volume() );
+        return it.charges_per_volume( remaining_volume(), true );
     }
 }
 
@@ -2146,9 +2354,9 @@ int item_pocket::charges_per_remaining_weight( const item &it ) const
                 non_it_weight -= contained.weight();
             }
         }
-        return it.charges_per_weight( non_it_weight ) - contained_charges;
+        return it.charges_per_weight( non_it_weight, true ) - contained_charges;
     } else {
-        return it.charges_per_weight( remaining_weight() );
+        return it.charges_per_weight( remaining_weight(), true );
     }
 }
 
@@ -2202,18 +2410,24 @@ std::vector<item_pocket::favorite_settings>::iterator item_pocket::find_preset(
     return iter;
 }
 
-void item_pocket::delete_preset( const std::vector<item_pocket::favorite_settings>::iterator iter )
+void item_pocket::delete_preset( const std::vector<item_pocket::favorite_settings>::iterator
+                                 iter )
 {
     pocket_presets.erase( iter );
     save_presets();
 }
 
+void item_pocket::set_no_rigid( const std::set<sub_bodypart_id> &is_no_rigid )
+{
+    no_rigid = is_no_rigid;
+}
+
 void item_pocket::load_presets()
 {
-    cata::ifstream fin;
+    std::ifstream fin;
     cata_path file = PATH_INFO::pocket_presets();
 
-    fs::path file_path = file.get_unrelative_path();
+    std::filesystem::path file_path = file.get_unrelative_path();
     fin.open( file_path, std::ifstream::in | std::ifstream::binary );
 
     if( fin.good() ) {
@@ -2263,7 +2477,7 @@ units::volume pocket_data::max_contains_volume() const
         int stack_size = ammo_type->stack_size ? ammo_type->stack_size : 1;
         int max_count = ammo_restriction.at( ammo_type->ammo->type );
         units::volume this_volume =
-            1_ml * divide_round_up( ammo_type->volume / 1_ml * max_count, stack_size );
+            1_ml * divide_round_up( ammo_type->volume * max_count / 1_ml, stack_size );
         max_total_volume = std::max( max_total_volume, this_volume );
     }
     return max_total_volume;
@@ -2406,7 +2620,9 @@ bool item_pocket::favorite_settings::accepts_item( const item &it ) const
         return false;
     }
     const itype_id &id = it.typeId();
-    const item_category_id &cat = it.get_category_of_contents().id;
+    const item_category_id &cat = category_blacklist.empty() && category_whitelist.empty()
+                                  ? item_category_id{} :
+                                  it.get_category_of_contents().id;
 
     // if the item is explicitly listed in either of the lists, then it's clear what to do with it
     if( item_blacklist.count( id ) ) {
@@ -2478,6 +2694,16 @@ void item_pocket::favorite_settings::set_unloadable( bool flag )
 void item_pocket::favorite_settings::set_preset_name( const std::string &s )
 {
     preset_name = s;
+}
+
+void item_pocket::favorite_settings::set_was_edited()
+{
+    player_edited = true;
+}
+
+bool item_pocket::favorite_settings::was_edited() const
+{
+    return player_edited;
 }
 
 const std::optional<std::string> &item_pocket::favorite_settings::get_preset_name() const

@@ -1,14 +1,19 @@
 #include "computer.h"
 
-#include <clocale>
-#include <cstdlib>
+#include <locale>
 #include <sstream>
+#include <utility>
 
 #include "debug.h"
 #include "enum_conversions.h"
+#include "flexbuffer_json.h"
 #include "json.h"
+#include "map.h"
 #include "output.h"
+#include "point.h"
+#include "talker.h"
 #include "talker_furniture.h"
+#include "translation.h"
 #include "translations.h"
 
 template <typename E> struct enum_traits;
@@ -58,7 +63,16 @@ void computer_failure::deserialize( const JsonObject &jo )
     type = jo.get_enum_value<computer_failure_type>( "action" );
 }
 
-computer::computer( const std::string &new_name, int new_security, tripoint new_loc )
+computer::computer( const std::string &new_name, int new_security, map &here,
+                    tripoint_bub_ms new_loc )
+    : name( new_name ), mission_id( -1 ), security( new_security ), alerts( 0 ),
+      next_attempt( calendar::before_time_starts ),
+      access_denied( _( "ERROR!  Access denied!" ) )
+{
+    loc = here.get_abs( new_loc );
+}
+
+computer::computer( const std::string &new_name, int new_security, tripoint_abs_ms new_loc )
     : name( new_name ), mission_id( -1 ), security( new_security ), alerts( 0 ),
       next_attempt( calendar::before_time_starts ),
       access_denied( _( "ERROR!  Access denied!" ) )
@@ -113,9 +127,9 @@ void computer::set_mission( const int id )
 }
 
 // Methods for setting/getting misc key/value pairs.
-void computer::set_value( const std::string &key, const std::string &value )
+void computer::set_value( const std::string &key, diag_value value )
 {
-    values[ key ] = value;
+    values[ key ] = std::move( value );
 }
 
 void computer::remove_value( const std::string &key )
@@ -123,10 +137,9 @@ void computer::remove_value( const std::string &key )
     values.erase( key );
 }
 
-std::string computer::get_value( const std::string &key ) const
+diag_value const *computer::maybe_get_value( const std::string &key ) const
 {
-    auto it = values.find( key );
-    return ( it == values.end() ) ? "" : it->second;
+    return global_variables::_common_maybe_get_value( key, values );
 }
 
 static computer_action computer_action_from_legacy_enum( int val );
@@ -198,7 +211,7 @@ void computer::serialize( JsonOut &jout ) const
     jout.member( "eocs", eocs );
     jout.member( "chat_topics", chat_topics );
     jout.member( "values", values );
-    jout.member( "loc", loc );
+    jout.member( "location", loc );
     jout.end_object();
 }
 
@@ -219,7 +232,12 @@ void computer::deserialize( const JsonValue &jv )
         jo.read( "eocs", eocs );
         jo.read( "chat_topics", chat_topics );
         jo.read( "values", values );
-        jo.read( "loc", loc );
+        if( !jo.read( "location", loc ) ) {
+            // Backward compatibility code for change made 2025-02-19.
+            tripoint_bub_ms temp;
+            jo.read( "loc", temp );
+            loc = get_map().get_abs( temp );
+        }
     }
 }
 
@@ -339,6 +357,7 @@ std::string enum_to_string<computer_action>( const computer_action act )
         case COMPACT_GEIGER: return "geiger";
         case COMPACT_IRRADIATOR: return "irradiator";
         case COMPACT_LIST_BIONICS: return "list_bionics";
+        case COMPACT_LIST_MUTATIONS: return "list_mutations";
         case COMPACT_LOCK: return "lock";
         case COMPACT_MAP_SEWER: return "map_sewer";
         case COMPACT_MAP_SUBWAY: return "map_subway";

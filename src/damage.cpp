@@ -1,8 +1,8 @@
 #include "damage.h"
 
 #include <algorithm>
-#include <cstdlib>
 #include <map>
+#include <memory>
 #include <numeric>
 #include <string>
 #include <utility>
@@ -10,15 +10,18 @@
 #include "bodypart.h"
 #include "cata_utility.h"
 #include "creature.h"
-#include "effect_on_condition.h"
 #include "debug.h"
+#include "dialogue.h"
+#include "effect_on_condition.h"
+#include "flexbuffer_json.h"
 #include "generic_factory.h"
 #include "item.h"
 #include "json.h"
 #include "make_static.h"
 #include "monster.h"
 #include "mtype.h"
-#include "translations.h"
+#include "subbodypart.h"
+#include "talker.h"
 #include "units.h"
 
 static std::map<damage_info_order::info_type, std::vector<damage_info_order>> sorted_order_lists;
@@ -106,7 +109,7 @@ static damage_info_order::info_disp read_info_disp( const std::string &s )
     }
 }
 
-void damage_type::load( const JsonObject &jo, const std::string & )
+void damage_type::load( const JsonObject &jo, std::string_view src )
 {
     mandatory( jo, was_loaded, "name", name );
     optional( jo, was_loaded, "skill", skill, skill_id::NULL_ID() );
@@ -122,7 +125,7 @@ void damage_type::load( const JsonObject &jo, const std::string & )
         if( jsobj.has_array( "monster" ) ) {
             mon_immune_flags.clear();
             for( const std::string flg : jsobj.get_array( "monster" ) ) {
-                mon_immune_flags.insert( io::string_to_enum<m_flag>( flg ) );
+                mon_immune_flags.insert( flg );
             }
         }
         if( jsobj.has_array( "character" ) ) {
@@ -141,11 +144,15 @@ void damage_type::load( const JsonObject &jo, const std::string & )
 
     if( jo.has_array( "derived_from" ) ) {
         JsonArray ja = jo.get_array( "derived_from" );
-        derived_from = { damage_type_id( ja.get_string( 0 ) ), ja.get_float( 1 ) };
+        derived_from = { damage_type_id( ja.get_string( 0 ) ), static_cast<float>( ja.get_float( 1 ) ) };
     }
 
     for( JsonValue jv : jo.get_array( "onhit_eocs" ) ) {
-        onhit_eocs.push_back( effect_on_conditions::load_inline_eoc( jv, "" ) );
+        onhit_eocs.push_back( effect_on_conditions::load_inline_eoc( jv, std::string( src ) ) );
+    }
+
+    for( JsonValue jv : jo.get_array( "ondamage_eocs" ) ) {
+        ondamage_eocs.push_back( effect_on_conditions::load_inline_eoc( jv, std::string( src ) ) );
     }
 }
 
@@ -158,13 +165,13 @@ void damage_type::check()
             return dt.id == dio.dmg_type;
         } );
         if( iter == dio_list.end() ) {
-            debugmsg( "damage type %s has no associated damage_info_order type." );
+            debugmsg( "damage type %s has no associated damage_info_order type.", dt.id.c_str() );
         }
     }
 }
 
 void damage_info_order::damage_info_order_entry::load( const JsonObject &jo,
-        const std::string &member )
+        std::string_view member )
 {
     if( jo.has_object( member ) || jo.has_int( member ) ) {
         if( jo.has_int( member ) ) {
@@ -178,7 +185,7 @@ void damage_info_order::damage_info_order_entry::load( const JsonObject &jo,
     }
 }
 
-void damage_info_order::load( const JsonObject &jo, const std::string & )
+void damage_info_order::load( const JsonObject &jo, std::string_view )
 {
     dmg_type = damage_type_id( id.c_str() );
     bionic_info.load( jo, "bionic_info" );
@@ -295,8 +302,6 @@ bool damage_unit::operator==( const damage_unit &other ) const
            unconditional_damage_mult == other.unconditional_res_mult;
 }
 
-damage_instance::damage_instance() = default;
-
 damage_instance::damage_instance( const damage_type_id &dt, float amt, float arpen,
                                   float arpen_mult, float dmg_mult, float unc_arpen_mult, float unc_dmg_mult )
 {
@@ -385,6 +390,52 @@ void damage_type::onhit_effects( Creature *source, Creature *target ) const
     for( const effect_on_condition_id &eoc : onhit_eocs ) {
         dialogue d( source == nullptr ? nullptr : get_talker_for( source ),
                     target == nullptr ? nullptr : get_talker_for( target ) );
+
+        if( eoc->type == eoc_type::ACTIVATION ) {
+            eoc->activate( d );
+        } else {
+            debugmsg( "Must use an activation eoc for a damage type effect.  If you don't want the effect_on_condition to happen on its own (without the damage type effect being activated), remove the recurrence min and max.  Otherwise, create a non-recurring effect_on_condition for this damage type with its condition and effects, then have a recurring one queue it." );
+        }
+    }
+}
+
+void damage_instance::ondamage_effects( Creature *source, Creature *target,
+                                        const damage_instance &premitigated, bodypart_str_id bp ) const
+{
+    std::set<damage_type_id> used_types;
+    for( const damage_unit &du : damage_units ) {
+        if( used_types.count( du.type ) > 0 ) {
+            continue;
+        }
+        used_types.emplace( du.type );
+
+        // get the original damage
+        auto predamageunit = std::find_if( premitigated.begin(),
+        premitigated.end(), [du]( const damage_unit & dut ) {
+            return dut.type == du.type;
+        } );
+
+        double premit = 0.0;
+        if( predamageunit != premitigated.end() ) {
+            premit = predamageunit->amount;
+        }
+        if( !target->is_immune_damage( du.type ) ) {
+            du.type->ondamage_effects( source, target, bp, premit, du.amount );
+        }
+    }
+}
+
+void damage_type::ondamage_effects( Creature *source, Creature *target, bodypart_str_id bp,
+                                    double total_damage, double damage_taken ) const
+{
+    for( const effect_on_condition_id &eoc : ondamage_eocs ) {
+        dialogue d( source == nullptr ? nullptr : get_talker_for( source ),
+                    target == nullptr ? nullptr : get_talker_for( target ) );
+
+        d.set_value( "damage_taken", damage_taken );
+        d.set_value( "total_damage", total_damage );
+        d.set_value( "bp", bp.str() );
+
         if( eoc->type == eoc_type::ACTIVATION ) {
             eoc->activate( d );
         } else {
@@ -406,6 +457,7 @@ damage_instance damage_instance::di_considering_length( units::length barrel_len
     for( damage_unit &du : di.damage_units ) {
         if( !du.barrels.empty() ) {
             std::vector<std::pair<float, float>> lerp_points;
+            lerp_points.reserve( du.barrels.size() );
             for( const barrel_desc &b : du.barrels ) {
                 lerp_points.emplace_back( static_cast<float>( b.barrel_length.value() ), b.amount );
             }
@@ -486,16 +538,116 @@ bool damage_instance::operator==( const damage_instance &other ) const
     return damage_units == other.damage_units;
 }
 
-void damage_instance::deserialize( const JsonValue &jsin )
+damage_unit &damage_unit::operator*=( const double rhs )
 {
-    // TODO: Clean up
-    if( jsin.test_object() ) {
-        JsonObject jo = jsin.get_object();
-        damage_units = load_damage_instance( jo ).damage_units;
-    } else if( jsin.test_array() ) {
-        damage_units = load_damage_instance( jsin.get_array() ).damage_units;
+    amount *= rhs;
+    return *this;
+}
+
+bool damage_instance::handle_proportional( const JsonValue &jval )
+{
+    if( !jval.test_object() ) {
+        return false;
+    }
+    JsonObject jo = jval.get_object();
+
+    damage_type_id proportional_type;
+    if( jo.has_string( "damage_type" ) ) {
+        proportional_type = damage_type_id( jo.get_string( "damage_type" ) );
     } else {
-        jsin.throw_error( "Expected object or array for damage_instance" );
+        jo.throw_error( "no damage_type provided to proportional damage_instance" );
+        return false;
+    }
+
+    auto iter = std::find_if( damage_units.begin(), damage_units.end(),
+    [&proportional_type]( const damage_unit & du ) {
+        return du.type == proportional_type;
+    } );
+    if( iter != damage_units.end() ) {
+        damage_unit &prop_damage = *iter;
+        prop_damage.amount *= read_proportional_entry( jo, "amount" );
+        prop_damage.damage_multiplier *= read_proportional_entry( jo, "damage_multiplier" );
+        prop_damage.res_pen *= read_proportional_entry( jo, "armor_penetration" );
+        prop_damage.res_mult *= read_proportional_entry( jo, "armor_multiplier" );
+        prop_damage.unconditional_res_mult *= read_proportional_entry( jo, "constant_armor_multiplier" );
+        prop_damage.unconditional_damage_mult *= read_proportional_entry( jo,
+                "constant_damage_multiplier" );
+        float barrel_mult = read_proportional_entry( jo, "barrels" );
+        for( barrel_desc &bd : prop_damage.barrels ) {
+            bd.amount *= barrel_mult;
+        }
+    } else {
+        jo.throw_error( "proportional damage instance modifying nonexistent damage_type" );
+        return false;
+    }
+    return true;
+}
+
+damage_unit &damage_unit::operator+=( const damage_unit &rhs )
+{
+    amount += rhs.amount;
+    res_pen += rhs.res_pen;
+    res_mult += rhs.res_mult;
+    damage_multiplier += rhs.damage_multiplier;
+    unconditional_damage_mult += rhs.unconditional_damage_mult;
+
+    for( barrel_desc &bd : barrels ) {
+        bd.amount += rhs.amount;
+    }
+    return *this;
+}
+
+damage_instance &damage_instance::operator+=( const damage_instance &rhs )
+{
+    for( damage_unit &val_dmg : damage_units ) {
+        for( const damage_unit &tmp : rhs.damage_units ) {
+            if( tmp.type != val_dmg.type ) {
+                continue;
+            }
+
+            damage_unit relative_copy = tmp;
+            // res_mult is set to 1 if it's not specified. Set it to zero so we don't accidentally add to it
+            if( relative_copy.res_mult == 1.0f ) {
+                relative_copy.res_mult = 0;
+            }
+            // Same for damage_multiplier
+            if( relative_copy.damage_multiplier == 1.0f ) {
+                relative_copy.damage_multiplier = 0;
+            }
+            // As well as the unconditional versions
+            if( relative_copy.unconditional_res_mult == 1.0f ) {
+                relative_copy.unconditional_res_mult = 0;
+            }
+            if( relative_copy.unconditional_damage_mult == 1.0f ) {
+                relative_copy.unconditional_damage_mult = 0;
+            }
+
+            val_dmg += relative_copy;
+        }
+    }
+    return *this;
+}
+
+void damage_instance::deserialize( const JsonValue &val )
+{
+    auto read_damage_unit = []( const JsonObject & jo ) {
+        damage_unit du;
+        du.load( jo );
+        return du;
+    };
+
+    if( val.test_object() ) {
+        add( read_damage_unit( val.get_object() ) );
+    } else if( val.test_array() ) {
+        for( const JsonValue &du_val : val.get_array() ) {
+            if( du_val.test_object() ) {
+                add( read_damage_unit( du_val.get_object() ) );
+            } else {
+                val.throw_error( "incorrect format for damage_instance; must be object or array of objects" );
+            }
+        }
+    } else {
+        val.throw_error( "incorrect format for damage_instance; must be object or array" );
     }
 }
 
@@ -532,14 +684,6 @@ int dealt_damage_instance::total_damage() const
     []( int acc, const std::pair<const damage_type_id, int> &dmg ) {
         return acc + dmg.second;
     } );
-}
-
-resistances::resistances()
-{
-    resist_vals.clear();
-    for( const damage_type &dam : damage_type::get_all() ) {
-        resist_vals.emplace( dam.id, 0.0f );
-    }
 }
 
 resistances::resistances( const item &armor, bool to_self, int roll, const bodypart_id &bp )
@@ -581,18 +725,6 @@ float resistances::get_effective_resist( const damage_unit &du ) const
                      0.0f ) * du.res_mult * du.unconditional_res_mult;
 }
 
-resistances &resistances::operator+=( const resistances &other )
-{
-    for( const auto &dam : other.resist_vals ) {
-        if( resist_vals.count( dam.first ) <= 0 ) {
-            resist_vals[dam.first] = 0.0f;
-        }
-        resist_vals[dam.first] += dam.second;
-    }
-
-    return *this;
-}
-
 bool resistances::operator==( const resistances &other )
 {
     for( const auto &dam : other.resist_vals ) {
@@ -622,116 +754,27 @@ resistances resistances::operator/( float mod ) const
     return ret;
 }
 
-static damage_unit load_damage_unit( const JsonObject &curr )
+void damage_unit::load( const JsonObject &jo )
 {
-    damage_type_id dt( curr.get_string( "damage_type" ) );
-
-    float amount = curr.get_float( "amount", 0 );
-    float arpen = curr.get_float( "armor_penetration", 0 );
-    float armor_mul = curr.get_float( "armor_multiplier", 1.0f );
-    float damage_mul = curr.get_float( "damage_multiplier", 1.0f );
-
-    float unc_armor_mul = curr.get_float( "constant_armor_multiplier", 1.0f );
-    float unc_damage_mul = curr.get_float( "constant_damage_multiplier", 1.0f );
-
-    damage_unit du( dt, amount, arpen, armor_mul, damage_mul, unc_armor_mul,
-                    unc_damage_mul );
-
-    optional( curr, false, "barrels", du.barrels );
-
-    return du;
+    mandatory( jo, was_loaded, "damage_type", type );
+    optional( jo, was_loaded, "amount", amount, 0 );
+    optional( jo, was_loaded, "damage_multiplier", damage_multiplier, 1.0f );
+    optional( jo, was_loaded, "armor_penetration", res_pen, 0 );
+    optional( jo, was_loaded, "armor_multiplier", res_mult, 1.0f );
+    optional( jo, was_loaded, "constant_armor_multiplier", unconditional_res_mult, 1.0f );
+    optional( jo, was_loaded, "constant_damage_multiplier", unconditional_damage_mult, 1.0f );
+    optional( jo, was_loaded, "barrels", barrels );
 }
 
-static damage_unit load_damage_unit_inherit( const JsonObject &curr, const damage_instance &parent )
+void damage_unit::deserialize( const JsonObject &jo )
 {
-    damage_unit ret = load_damage_unit( curr );
-
-    const std::vector<damage_unit> &parent_damage = parent.damage_units;
-    auto du_iter = std::find_if( parent_damage.begin(),
-    parent_damage.end(), [&ret]( const damage_unit & dmg ) {
-        return dmg.type == ret.type;
-    } );
-
-    if( du_iter == parent_damage.end() ) {
-        return ret;
-    }
-
-    const damage_unit &parent_du = *du_iter;
-
-    if( !curr.has_float( "amount" ) ) {
-        ret.amount = parent_du.amount;
-    }
-    if( !curr.has_float( "armor_penetration" ) ) {
-        ret.res_pen = parent_du.res_pen;
-    }
-    if( !curr.has_float( "armor_multiplier" ) ) {
-        ret.res_mult = parent_du.res_mult;
-    }
-    if( !curr.has_float( "damage_multiplier" ) ) {
-        ret.damage_multiplier = parent_du.damage_multiplier;
-    }
-    if( !curr.has_float( "constant_armor_multiplier" ) ) {
-        ret.unconditional_res_mult = parent_du.unconditional_res_mult;
-    }
-    if( !curr.has_float( "constant_damage_multiplier" ) ) {
-        ret.unconditional_damage_mult = parent_du.unconditional_damage_mult;
-    }
-    if( !curr.has_array( "barrels" ) ) {
-        ret.barrels = parent_du.barrels;
-    }
-
-    return ret;
+    load( jo );
 }
 
-static damage_instance blank_damage_instance()
-{
-    damage_instance ret;
-
-    for( const damage_type &dam : damage_type::get_all() ) {
-        ret.add_damage( dam.id, 0.0f );
-    }
-
-    return ret;
-}
-
-damage_instance load_damage_instance( const JsonObject &jo )
-{
-    return load_damage_instance_inherit( jo, blank_damage_instance() );
-}
-
-damage_instance load_damage_instance( const JsonArray &jarr )
-{
-    return load_damage_instance_inherit( jarr, blank_damage_instance() );
-}
-
-damage_instance load_damage_instance_inherit( const JsonObject &jo, const damage_instance &parent )
-{
-    damage_instance di;
-    if( jo.has_array( "values" ) ) {
-        for( const JsonObject curr : jo.get_array( "values" ) ) {
-            di.damage_units.push_back( load_damage_unit_inherit( curr, parent ) );
-        }
-    } else if( jo.has_string( "damage_type" ) ) {
-        di.damage_units.push_back( load_damage_unit_inherit( jo, parent ) );
-    }
-
-    return di;
-}
-
-damage_instance load_damage_instance_inherit( const JsonArray &jarr, const damage_instance &parent )
-{
-    damage_instance di;
-    for( const JsonObject curr : jarr ) {
-        di.damage_units.push_back( load_damage_unit_inherit( curr, parent ) );
-    }
-
-    return di;
-}
-
-std::map<damage_type_id, float> load_damage_map( const JsonObject &jo,
+std::unordered_map<damage_type_id, float> load_damage_map( const JsonObject &jo,
         const std::set<std::string> &ignored_keys )
 {
-    std::map<damage_type_id, float> ret;
+    std::unordered_map<damage_type_id, float> ret;
     for( const JsonMember &jmemb : jo ) {
         if( !ignored_keys.empty() && ignored_keys.count( jmemb.name() ) > 0 ) {
             continue;
@@ -741,7 +784,7 @@ std::map<damage_type_id, float> load_damage_map( const JsonObject &jo,
     return ret;
 }
 
-void finalize_damage_map( std::map<damage_type_id, float> &damage_map, bool force_derive,
+void finalize_damage_map( std::unordered_map<damage_type_id, float> &damage_map, bool force_derive,
                           float default_value )
 {
     const std::vector<damage_type> &dams = damage_type::get_all();
@@ -783,6 +826,16 @@ void finalize_damage_map( std::map<damage_type_id, float> &damage_map, bool forc
     }
 }
 
+resistances extend_resistances_instance( resistances ret, const JsonObject &jo )
+{
+    resistances ext;
+    ext.resist_vals = load_damage_map( jo );
+    for( const std::pair<const damage_type_id, float> &damage_pair : ext.resist_vals ) {
+        ret.resist_vals[damage_pair.first] += damage_pair.second;
+    }
+    return ret;
+}
+
 resistances load_resistances_instance( const JsonObject &jo,
                                        const std::set<std::string> &ignored_keys )
 {
@@ -817,12 +870,7 @@ void damage_over_time_data::serialize( JsonOut &jsout ) const
 
 void damage_over_time_data::deserialize( const JsonObject &jo )
 {
-    std::string tmp_string = jo.get_string( "damage_type" );
-    // Remove after 0.F, migrating DT_TRUE to DT_PURE
-    if( tmp_string == "true" ) {
-        tmp_string = "pure";
-    }
-    type = damage_type_id( tmp_string );
+    jo.read( "damage_type", type );
     jo.read( "amount", amount );
     jo.read( "duration", duration );
     jo.read( "bodyparts", bps );

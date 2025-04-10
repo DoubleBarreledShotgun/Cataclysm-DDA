@@ -59,7 +59,6 @@
     "type": "mapgen",
     "method": "json",
     "om_terrain": [ "orchard_roof" ],
-    "weight": 100,
     "object": {
       "fill_ter": "t_shingle_flat_roof",
       "rows": [
@@ -72,13 +71,13 @@
         "                        ",
         "                        ",
         "                        ",
-        "        |2222223        ",
-        "        |......3        ",
-        "        |......3        ",
-        "        |......3        ",
-        "        5......3        ",
-        "        |......3        ",
-        "        |------3        ",
+        "        --------        ",
+        "        -......-        ",
+        "        -......-        ",
+        "        -......-        ",
+        "        5......-        ",
+        "        -......-        ",
+        "        --------        ",
         "                        ",
         "                        ",
         "                        ",
@@ -88,7 +87,8 @@
         "                        ",
         "                        "
       ],
-      "palettes": [ "roof_palette" ]
+      "palettes": [ "roof_palette" ],
+      "terrain": { ".": "t_shingle_flat_roof" }
     }
   },
   {
@@ -156,7 +156,6 @@
     "type": "mapgen",
     "method": "json",
     "om_terrain": [ "orchard_roof_1" ],
-    "weight": 100,
     "object": {
       "fill_ter": "t_shingle_flat_roof",
       "rows": [
@@ -166,13 +165,13 @@
         "                        ",
         "                        ",
         "                        ",
-        "  |22223                ",
-        "  |....3                ",
-        "  |....3                ",
-        "  |....3                ",
-        "  |....3                ",
-        "  |....3                ",
-        "  |5---3                ",
+        "  ------                ",
+        "  -....-                ",
+        "  -....-                ",
+        "  -....-                ",
+        "  -....-                ",
+        "  -....-                ",
+        "  -5----                ",
         "                        ",
         "                        ",
         "                        ",
@@ -185,7 +184,8 @@
         "                        ",
         "                        "
       ],
-      "palettes": [ "roof_palette" ]
+      "palettes": [ "roof_palette" ],
+      "terrain": { ".": "t_shingle_flat_roof" }
     }
   }
 ]

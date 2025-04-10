@@ -2,10 +2,9 @@
 #ifndef CATA_SRC_MISSION_COMPANION_H
 #define CATA_SRC_MISSION_COMPANION_H
 
-#include <iosfwd>
 #include <map>
-#include <new>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -13,14 +12,16 @@
 #include "coordinates.h"
 #include "mapgendata.h"
 #include "memory_fast.h"
-#include "point.h"
 #include "type_id.h"
 
+class JsonOut;
+class JsonValue;
 class item;
 class monster;
 class npc;
 class npc_template;
 struct comp_rank;
+template <typename E> struct enum_traits;
 
 using npc_ptr = shared_ptr_fast<npc>;
 using comp_list = std::vector<npc_ptr>;
@@ -47,9 +48,11 @@ enum mission_kind : int {
     Caravan_Commune_Center_Job,
 
     //  Faction camp tasks
-    Camp_Distribute_Food,  //  Direct action, not serialized
-    Camp_Hide_Mission,     //  Direct action, not serialized
-    Camp_Reveal_Mission,   //  Direct action, not serialized
+    Camp_Distribute_Food,        //  Direct action, not serialized
+    Camp_Determine_Leadership,   //  Direct action, not serialized
+    Camp_Have_Meal,              //  Direct action, not serialized
+    Camp_Hide_Mission,           //  Direct action, not serialized
+    Camp_Reveal_Mission,         //  Direct action, not serialized
     Camp_Assign_Jobs,
     Camp_Assign_Workers,
     Camp_Abandon,
@@ -59,6 +62,7 @@ enum mission_kind : int {
     Camp_Gather_Materials,
     Camp_Collect_Firewood,
     Camp_Menial,
+    Camp_Survey_Field,
     Camp_Survey_Expansion,
     Camp_Cut_Logs,
     Camp_Clearcut,
@@ -71,7 +75,6 @@ enum mission_kind : int {
     Camp_Recruiting,
     Camp_Scouting,
     Camp_Combat_Patrol,
-    Camp_Chop_Shop,  //  Obsolete removed during 0.E
     Camp_Plow,
     Camp_Plant,
     Camp_Harvest,
@@ -101,7 +104,7 @@ struct mission_id {
     mission_kind id = No_Mission;
     std::string parameters;
     mapgen_arguments mapgen_args;
-    std::optional<point> dir;
+    std::optional<point_rel_omt> dir;
 
     void serialize( JsonOut & ) const;
     void deserialize( const JsonValue & );
@@ -182,7 +185,8 @@ npc_ptr individual_mission( npc &p, const std::string &desc, const mission_id &m
 npc_ptr individual_mission( const tripoint_abs_omt &omt_pos, const std::string &role_id,
                             const std::string &desc, const mission_id &miss_id,
                             bool group = false, const std::vector<item *> &equipment = {},
-                            const std::map<skill_id, int> &required_skills = {}, bool silent_failure = false );
+                            const std::map<skill_id, int> &required_skills = {}, bool silent_failure = false,
+                            const npc_ptr &preselected_choice = nullptr );
 
 ///All of these missions are associated with the ranch camp and need to be updated/merged into the new ones
 void caravan_return( npc &p, const std::string &dest, const mission_id &miss_id );
@@ -221,7 +225,7 @@ npc_ptr temp_npc( const string_id<npc_template> &type );
 //Utility functions
 /// Returns npcs that have the given companion mission.
 comp_list companion_list( const npc &p, const mission_id &miss_id, bool contains = false );
-comp_list companion_list( const tripoint &omt_pos, const std::string &role_id,
+comp_list companion_list( const tripoint_abs_omt &omt_pos, const std::string &role_id,
                           const mission_id &miss_id, bool contains = false );
 comp_list companion_sort( comp_list available,
                           const std::map<skill_id, int> &required_skills = {} );

@@ -1,16 +1,25 @@
+#include <list>
+#include <map>
+#include <optional>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "cata_catch.h"
-#include "game.h"
+#include "coordinates.h"
 #include "item.h"
 #include "item_group.h"
+#include "map.h"
 #include "map_helpers.h"
 #include "mutation.h"
+#include "point.h"
 #include "profession.h"
 #include "recipe.h"
 #include "test_data.h"
+#include "type_id.h"
+#include "units.h"
 #include "vehicle.h"
-#include "veh_type.h"
+#include "vpart_position.h"
 
 static std::string get_section_name( const spawn_type &type )
 {
@@ -32,7 +41,7 @@ static std::string get_section_name( const spawn_type &type )
     return "unknown type";
 }
 
-TEST_CASE( "correct amounts of an item spawn inside a container", "[item_spawn]" )
+TEST_CASE( "correct_amounts_of_an_item_spawn_inside_a_container", "[item_spawn]" )
 {
     REQUIRE_FALSE( test_data::container_spawn_data.empty() );
 
@@ -54,12 +63,14 @@ TEST_CASE( "correct amounts of an item spawn inside a container", "[item_spawn]"
                         case spawn_type::vehicle: {
                             clear_map();
                             map &here = get_map();
-                            here.add_vehicle( cs_data.vehicle, point_zero, 0_degrees, -1, 0 );
+                            const tripoint_bub_ms vehpos( 0, 0, here.get_abs_sub().z() );
+                            vehicle *veh = here.add_vehicle( cs_data.vehicle, vehpos, 0_degrees, 0, 0 );
+                            REQUIRE( veh );
                             REQUIRE( here.get_vehicles().size() == 1 );
-                            vehicle *veh = here.get_vehicles()[0].v;
-                            int part = veh->avail_part_with_feature( point_zero, "CARGO" );
-                            REQUIRE( part >= 0 );
-                            for( item &it : veh->get_items( part ) ) {
+                            const tripoint_bub_ms pos( point_bub_ms::zero, veh->sm_pos.z() );
+                            const std::optional<vpart_reference> ovp_cargo = here.veh_at( pos ).cargo();
+                            REQUIRE( ovp_cargo );
+                            for( item &it : ovp_cargo->items() ) {
                                 items.push_back( it );
                             }
                             break;
@@ -76,8 +87,8 @@ TEST_CASE( "correct amounts of an item spawn inside a container", "[item_spawn]"
                         case spawn_type::map: {
                             clear_map();
                             map &here = get_map();
-                            here.spawn_item( tripoint_zero, cs_data.item, 1, cs_data.charges );
-                            for( item &it : here.i_at( tripoint_zero ) ) {
+                            here.spawn_item( tripoint_bub_ms::zero, cs_data.item, 1, cs_data.charges );
+                            for( item &it : here.i_at( tripoint_bub_ms::zero ) ) {
                                 items.push_back( it );
                             }
                             break;

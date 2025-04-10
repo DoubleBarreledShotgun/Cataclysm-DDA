@@ -1,62 +1,53 @@
+#pragma once
 #ifndef CATA_SRC_MATH_PARSER_DIAG_H
 #define CATA_SRC_MATH_PARSER_DIAG_H
 
-#include <array>
-#include <functional>
+#include <map>
+#include <string>
 #include <string_view>
+#include <utility>
+#include <variant>
 #include <vector>
 
+#include "math_parser_diag_value.h"
+
+struct const_dialogue;
 struct dialogue;
+
+struct diag_kwargs {
+    using impl_t = std::map<std::string, diag_value>;
+
+    impl_t kwargs;
+
+    template<typename T = std::monostate>
+    diag_value kwarg_or( std::string const &key, T const &default_value = {} ) const {
+        if( auto it = kwargs.find( key ); it != kwargs.end() ) {
+            return it->second;
+        }
+        return diag_value{ default_value };
+    }
+};
 struct dialogue_func {
-    dialogue_func( std::string_view s_, std::string_view sc_, int n_ ) : symbol( s_ ),
-        scopes( sc_ ), num_params( n_ ) {}
-    std::string_view symbol;
+    using fe_t = double( * )( const_dialogue const &, char, std::vector<diag_value> const &,
+                              diag_kwargs const & );
+    using fa_t = void( * )( double val, dialogue &, char, std::vector<diag_value> const &,
+                            diag_kwargs const & );
+
+    using kwargs_t = std::vector<std::string_view>;
+
+    dialogue_func( std::string_view sc_, int n_, fe_t fe_, fa_t fa_ = {}, kwargs_t kw_ = {} )
+        : scopes( sc_ ), num_params( n_ ), fe( fe_ ), fa( fa_ ), kwargs( std::move( kw_ ) )
+    {}
     std::string_view scopes;
     int num_params{};
+
+    fe_t fe;
+    fa_t fa;
+
+    kwargs_t kwargs;
 };
+using pdiag_func = dialogue_func const *;
 
-struct dialogue_func_eval : dialogue_func {
-    using f_t = std::function<double( dialogue const & )> ( * )( char scope,
-                std::vector<std::string> const & );
-
-    dialogue_func_eval( std::string_view s_, std::string_view sc_, int n_, f_t f_ )
-        : dialogue_func( s_, sc_, n_ ), f( f_ ) {}
-
-    f_t f;
-};
-
-struct dialogue_func_ass : dialogue_func {
-    using f_t = std::function<void( dialogue const &, double )> ( * )( char scope,
-                std::vector<std::string> const & );
-
-    dialogue_func_ass( std::string_view s_, std::string_view sc_, int n_, f_t f_ )
-        : dialogue_func( s_, sc_, n_ ), f( f_ ) {}
-
-    f_t f;
-};
-
-using pdiag_func_eval = dialogue_func_eval const *;
-using pdiag_func_ass = dialogue_func_ass const *;
-
-std::function<double( dialogue const & )> u_val( char scope,
-        std::vector<std::string> const &params );
-std::function<void( dialogue const &, double )> u_val_ass( char scope,
-        std::vector<std::string> const &params );
-
-std::function<double( dialogue const & )> pain_eval( char scope,
-        std::vector<std::string> const &/* params */ );
-
-std::function<void( dialogue const &, double )> pain_ass( char scope,
-        std::vector<std::string> const &/* params */ );
-
-inline std::array<dialogue_func_eval, 2> const dialogue_eval_f{
-    dialogue_func_eval{ "val", "un", -1, u_val },
-    dialogue_func_eval{ "pain", "un", 0, pain_eval },
-};
-
-inline std::array<dialogue_func_ass, 2> const dialogue_assign_f{
-    dialogue_func_ass{ "val", "un", -1, u_val_ass },
-    dialogue_func_ass{ "pain", "un", 0, pain_ass },
-};
+std::map<std::string_view, dialogue_func> const &get_all_diag_funcs();
 
 #endif // CATA_SRC_MATH_PARSER_DIAG_H

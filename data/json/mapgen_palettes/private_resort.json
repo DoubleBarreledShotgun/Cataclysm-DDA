@@ -2,14 +2,15 @@
   {
     "type": "palette",
     "id": "p_resort_palette_main",
+    "palettes": [ "parametrized_walls_palette" ],
     "furniture": {
-      "#": "f_counter",
+      "w": "f_counter",
       ";": "f_counter_gate_c",
       "T": "f_table",
       "H": "f_armchair",
       "Z": [ "f_crate_c", "f_crate_o", "f_cardboard_box" ],
       "f": "f_glass_fridge",
-      "]": "f_fridge",
+      "]": [ "f_heavy_duty_fridge", "f_heavy_duty_freezer" ],
       "O": "f_oven",
       "S": "f_sink",
       "j": "f_bench",
@@ -29,7 +30,6 @@
       "<": "t_stairs_up",
       ">": "t_stairs_down",
       "-": "t_door_metal_c",
-      "|": "t_wall_w",
       "o": "t_window_domestic",
       ".": "t_floor",
       ",": "t_carpet_red",
@@ -44,9 +44,9 @@
     },
     "toilets": { "$": {  } },
     "items": {
-      "$": { "item": "stash_drugs", "chance": 75 },
-      "Y": { "item": "mansion_safe", "chance": 100, "repeat": [ 3, 8 ] },
-      "l": { "item": "trash", "chance": 66, "repeat": [ 1, 3 ] },
+      "$": [ { "item": "stash_drugs_illegals", "chance": 75 }, { "item": "SUS_toilet", "chance": 50 } ],
+      "Y": { "item": "mansion_safe_nogun", "chance": 100, "repeat": [ 3, 8 ] },
+      "l": { "item": "SUS_trash_trashcan", "chance": 66, "repeat": [ 1, 3 ] },
       "e": { "item": "SUS_office_desk", "chance": 50 },
       "K": { "item": "unisex_coat_rack", "chance": 33, "repeat": [ 1, 3 ] },
       "i": { "item": "underwear", "chance": 100 },
@@ -66,6 +66,7 @@
     "id": "p_resort_palette_main_floor",
     "palettes": [ "p_resort_palette_main" ],
     "furniture": {
+      "A": "f_atm_off",
       "d": "f_dishwasher",
       "{": "f_cupboard",
       "g": "f_dumpster",
@@ -79,13 +80,14 @@
       "0": "f_bigmirror",
       "V": "f_wardrobe",
       "1": "f_shower",
-      "2": "f_water_heater",
+      "2": "f_water_heater_family",
       "3": "f_home_furnace",
       "4": "f_air_conditioner",
       "5": "f_standing_tank",
       "t": "f_pool_table",
       "6": "f_arcade_machine",
       "9": "f_piano",
+      "§": "f_barstool",
       "'": "f_speaker_cabinet",
       "(": "f_roulette_table",
       "*": "f_hedge_short",
@@ -108,7 +110,6 @@
       "n": "t_carpet_green",
       "q": "t_window_bars",
       "Q": "t_window_stained_red",
-      "A": "t_atm",
       "@": "t_slot_machine",
       "9": "t_carpet_red",
       "C": "t_carpet_red",
@@ -163,17 +164,18 @@
       "2": "f_cupboard",
       "3": "f_cupboard",
       "5": "f_sink",
+      "§": "f_barstool",
       "6": "f_rack_wood",
       "d": "f_dishwasher"
     },
     "terrain": {
       "f": "t_carpet_red",
-      "#": "t_carpet_red",
+      "C": "t_carpet_red",
       "S": "t_carpet_red",
       "T": "t_carpet_red",
       "H": "t_carpet_red",
       ";": "t_carpet_red",
-      "s": "t_carpet_red"
+      "§": "t_carpet_red"
     },
     "items": {
       "1": [ { "item": "SUS_dishes", "chance": 100 }, { "item": "SUS_silverware", "chance": 100 } ],
@@ -221,14 +223,14 @@
       "W": { "item": "laundry", "chance": 33, "repeat": [ 1, 6 ] },
       "z": { "item": "laundry", "chance": 33, "repeat": [ 1, 6 ] },
       "Z": { "item": "crate_wine", "chance": 50, "repeat": [ 1, 2 ] },
-      "_": { "item": "roof_trash", "chance": 1 },
+      "_": { "item": "SUS_trash_roof", "chance": 1 },
       "d": { "item": "dresser", "chance": 50, "repeat": [ 3, 6 ] },
       "B": { "item": "shower", "chance": 50, "repeat": [ 0, 1 ] },
       "b": { "item": "bed", "chance": 50, "repeat": [ 0, 2 ] },
       "T": { "item": "livingroom", "chance": 33, "repeat": [ 0, 3 ] },
       "^": { "item": "private_resort_coffee_table", "chance": 33, "repeat": [ 1, 3 ] },
       "L": { "item": "SUS_janitors_closet", "chance": 100 },
-      "#": [
+      "w": [
         { "item": "bar_table", "chance": 40, "repeat": [ 1, 2 ] },
         { "item": "bar_alcohol", "chance": 25, "repeat": [ 0, 2 ] }
       ]
@@ -239,7 +241,13 @@
     "id": "p_resort_palette_basement",
     "palettes": [ "p_resort_palette_main" ],
     "furniture": {
-      "1": "f_generator_broken",
+      "1": [
+        [ "f_generator_broken", 25 ],
+        [ "f_portable_generator", 5 ],
+        [ "f_diesel_generator", 5 ],
+        [ "f_military_generator", 5 ],
+        [ "f_12000_gasoline_generator", 5 ]
+      ],
       "2": "f_machinery_light",
       "3": "f_machinery_heavy",
       "N": "f_utility_shelf",

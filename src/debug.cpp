@@ -35,6 +35,7 @@
 #include "filesystem.h"
 #include "get_version.h"
 #include "input.h"
+#include "loading_ui.h"
 #include "mod_manager.h"
 #include "options.h"
 #include "output.h"
@@ -81,10 +82,11 @@
 #if defined(__ANDROID__)
 // used by android_version() function for __system_property_get().
 #include <sys/system_properties.h>
+#include "input_context.h"
 #endif
 
-#if (defined(__DragonFly__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)) && !defined(BSD)
-#define BSD
+#if (defined(__DragonFly__) || defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)) && !defined(CATA_IS_ON_BSD)
+#define CATA_IS_ON_BSD
 #endif
 
 // Static defines                                                   {{{1
@@ -112,8 +114,8 @@ static std::string captured;
 // Get the image base of a module from its PE header
 static uintptr_t get_image_base( const char *const path )
 {
-    HANDLE file = CreateFile( path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-                              FILE_ATTRIBUTE_NORMAL, NULL );
+    HANDLE file = CreateFile( path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+                              FILE_ATTRIBUTE_NORMAL, nullptr );
     if( file == INVALID_HANDLE_VALUE ) {
         return 0;
     }
@@ -121,8 +123,8 @@ static uintptr_t get_image_base( const char *const path )
         CloseHandle( file );
     } );
 
-    HANDLE mapping = CreateFileMapping( file, NULL, PAGE_READONLY, 0, 0, NULL );
-    if( mapping == NULL ) {
+    HANDLE mapping = CreateFileMapping( file, nullptr, PAGE_READONLY, 0, 0, nullptr );
+    if( mapping == nullptr ) {
         return 0;
     }
     on_out_of_scope close_mapping( [mapping]() {
@@ -132,7 +134,7 @@ static uintptr_t get_image_base( const char *const path )
     LONG nt_header_offset = 0;
     {
         LPVOID dos_header_view = MapViewOfFile( mapping, FILE_MAP_READ, 0, 0, sizeof( IMAGE_DOS_HEADER ) );
-        if( dos_header_view == NULL ) {
+        if( dos_header_view == nullptr ) {
             return 0;
         }
         on_out_of_scope close_dos_header_view( [dos_header_view]() {
@@ -148,7 +150,7 @@ static uintptr_t get_image_base( const char *const path )
 
     LPVOID pe_header_view = MapViewOfFile( mapping, FILE_MAP_READ, 0, 0,
                                            nt_header_offset + sizeof( IMAGE_NT_HEADERS ) );
-    if( pe_header_view == NULL ) {
+    if( pe_header_view == nullptr ) {
         return 0;
     }
     on_out_of_scope close_pe_header_view( [pe_header_view]() {
@@ -210,7 +212,7 @@ bool debug_mode = false;
 
 namespace debugmode
 {
-std::list<debug_filter> enabled_filters;
+std::unordered_set<debug_filter> enabled_filters;
 std::string filter_name( debug_filter value )
 {
     // see debug.h for commentary
@@ -228,6 +230,7 @@ std::string filter_name( debug_filter value )
         case DF_ANATOMY_BP: return "DF_ANATOMY_BP";
         case DF_AVATAR: return "DF_AVATAR";
         case DF_BALLISTIC: return "DF_BALLISTIC";
+        case DF_CAMPS: return "DF_CAMPS";
         case DF_CHARACTER: return "DF_CHARACTER";
         case DF_CHAR_CALORIES: return "DF_CHAR_CALORIES";
         case DF_CHAR_HEALTH: return "DF_CHAR_HEALTH";
@@ -242,9 +245,13 @@ std::string filter_name( debug_filter value )
         case DF_MAP: return "DF_MAP";
         case DF_MATTACK: return "DF_MATTACK";
         case DF_MELEE: return "DF_MELEE";
+        case DF_MONMOVE: return "DF_MONMOVE";
         case DF_MONSTER: return "DF_MONSTER";
         case DF_MUTATION: return "DF_MUTATION";
         case DF_NPC: return "DF_NPC";
+        case DF_NPC_COMBATAI: return "DF_NPC_COMBATAI";
+        case DF_NPC_ITEMAI: return "DF_NPC_ITEMAI";
+        case DF_NPC_MOVEAI: return "DF_NPC_MOVEAI";
         case DF_OVERMAP: return "DF_OVERMAP";
         case DF_RADIO: return "DF_RADIO";
         case DF_RANGED: return "DF_RANGED";
@@ -305,14 +312,16 @@ static void debug_error_prompt(
     if( !force && ignored_messages.count( msg_key ) > 0 ) {
         return;
     }
+    // gui loading screen might be drawing an image, we need to clean it up
+    loading_ui::done();
 
     std::string formatted_report =
         string_format( // developer-facing error report. INTENTIONALLY UNTRANSLATED!
-            " DEBUG    : %s\n\n"
-            " FUNCTION : %s\n"
-            " FILE     : %s\n"
-            " LINE     : %s\n"
-            " VERSION  : %s\n",
+            " DEBUG : %s\n\n"
+            " REPORTING FUNCTION : %s\n"
+            " C++ SOURCE FILE    : %s\n"
+            " LINE               : %s\n"
+            " VERSION            : %s\n",
             text, funcname, filename, line, getVersionString()
         );
 
@@ -360,7 +369,7 @@ static void debug_error_prompt(
                                 );
     ui.on_redraw( [&]( const ui_adaptor & ) {
         catacurses::erase();
-        fold_and_print( catacurses::stdscr, point_zero, getmaxx( catacurses::stdscr ), c_light_red,
+        fold_and_print( catacurses::stdscr, point::zero, getmaxx( catacurses::stdscr ), c_light_red,
                         "%s", message );
         wnoutrefresh( catacurses::stdscr );
     } );
@@ -383,7 +392,7 @@ static void debug_error_prompt(
             case 'i':
             case 'I':
                 ignored_messages.insert( msg_key );
-            /* fallthrough */
+                [[fallthrough]];
             case ' ':
                 stop = true;
                 break;
@@ -419,7 +428,7 @@ struct time_info {
         using char_t = typename Stream::char_type;
         using base   = std::basic_ostream<char_t>;
 
-        static_assert( std::is_base_of<base, Stream>::value );
+        static_assert( std::is_base_of_v<base, Stream> );
 
         out << std::setfill( '0' );
         out << std::setw( 2 ) << t.hours << ':' << std::setw( 2 ) << t.minutes << ':' <<
@@ -519,6 +528,19 @@ void realDebugmsg( const char *filename, const char *line, const char *funcname,
         return;
     }
 
+    // Enable the following to step in debug messages with a debugger
+#if 0
+    if( isDebuggerActive() ) {
+#if defined(_WIN32)
+        DebugBreak();
+        return;
+#elif defined( __linux__ )
+        raise( SIGTRAP );
+        return;
+#endif
+    }
+#endif //
+
     // Show excessive repetition prompt once per excessive set
     bool excess_repetition = rep_folder.repeat_count == repetition_folder::repetition_threshold;
 
@@ -611,39 +633,95 @@ static time_info get_time() noexcept
 }
 #endif
 
-struct DebugFile {
-    DebugFile();
-    ~DebugFile();
-    void init( DebugOutput, const std::string &filename );
-    void deinit();
-    std::ostream &get_file();
+#if defined(_WIN32)
+// Send the DebugLog stream to Windows' debug facility
+struct OutputDebugStreamA : public std::ostream {
 
+        // Use the file buffer from DebugFile
+        OutputDebugStreamA( const std::shared_ptr<std::ostream> &stream )
+            : std::ostream( &buf ), buf( stream->rdbuf() ) {}
+
+        // Intercept stream operations
+        struct _Buf : public std::streambuf {
+            _Buf( std::streambuf *buf ) : buf( buf ) {
+                output_string.reserve( max );
+            }
+            virtual int overflow( int c ) override {
+                if( EOF != c ) {
+                    buf->sputc( c );
+                    if( std::iscntrl( c ) ) {
+                        send();
+                    } else {
+                        output_string.push_back( c );
+                        if( output_string.size() >= max ) {
+                            send();
+                        }
+                    }
+                } else {
+                    send();
+                }
+                return c;
+            }
+            virtual std::streamsize xsputn( const char *s, std::streamsize n ) override {
+                std::streamsize rc = buf->sputn( s, n ), last = 0, i = 0;
+                for( ; i < n; ++i ) {
+                    if( std::iscntrl( static_cast<unsigned char>( s[i] ) ) ) {
+                        if( i == last + 1 ) { // Skip multiple empty lines
+                            last = i;
+                            continue;
+                        }
+                        const std::string sv( s + last, i - last );
+                        last = i;
+                        send( sv.c_str() );
+                    }
+                }
+                std::string append( s + last, n - last );
+                // Skip if only made of multiple newlines
+                if( none_of( append.begin(), append.end(), []( unsigned char c ) {
+                return std::iscntrl( c );
+                } ) ) {
+                    output_string.append( s + last, n - last );
+                }
+                if( output_string.size() >= max ) {
+                    send();
+                }
+                return rc;
+            }
+            void send( const char *s = nullptr ) {
+                if( s == nullptr ) {
+                    ::OutputDebugStringA( output_string.c_str() );
+                    output_string.clear();
+                } else {
+                    ::OutputDebugStringA( s );
+                }
+                buf->pubsync();
+            }
+            static constexpr std::streamsize max = 4096;
+            std::string output_string{};
+            std::streambuf *buf = nullptr;
+        } buf;
+};
+#endif
+
+struct DebugFile {
+    void init( DebugOutput, const cata_path &filename );
+    void deinit();
+    ~DebugFile() {
+        deinit();
+    }
+    std::ostream &get_file();
+    static DebugFile &instance() {
+        static DebugFile instance;
+        return instance;
+    };
     // Using shared_ptr for the type-erased deleter support, not because
     // it needs to be shared.
-    std::shared_ptr<std::ostream> file;
-    std::string filename;
+    std::shared_ptr<std::ostream> file = std::make_shared<std::ostringstream>();
+    cata_path filename;
 };
 
 // DebugFile OStream Wrapper                                        {{{2
 // ---------------------------------------------------------------------
-
-// needs to be inside the method to ensure it's initialized (and only once)
-// NOTE: using non-local static variables (defined at top level in cpp file) here is wrong,
-// because DebugLog (that uses them) might be called from the constructor of some non-local static entity
-// during dynamic initialization phase, when non-local static variables here are
-// only zero-initialized
-static DebugFile &debugFile()
-{
-    static DebugFile debugFile;
-    return debugFile;
-}
-
-DebugFile::DebugFile() = default;
-
-DebugFile::~DebugFile()
-{
-    deinit();
-}
 
 void DebugFile::deinit()
 {
@@ -658,44 +736,32 @@ void DebugFile::deinit()
 
 std::ostream &DebugFile::get_file()
 {
-    if( !file ) {
-        file = std::make_shared<std::ostringstream>();
-    }
     return *file;
 }
 
-void DebugFile::init( DebugOutput output_mode, const std::string &filename )
+void DebugFile::init( DebugOutput output_mode, const cata_path &filename )
 {
     std::shared_ptr<std::ostringstream> str_buffer = std::dynamic_pointer_cast<std::ostringstream>
             ( file );
 
+    bool rename_failed = false;
+    const cata_path oldfile = filename + ".prev";
     switch( output_mode ) {
         case DebugOutput::std_err:
             file = std::shared_ptr<std::ostream>( &std::cerr, null_deleter() );
             break;
         case DebugOutput::file: {
             this->filename = filename;
-            const std::string oldfile = filename + ".prev";
-            bool rename_failed = false;
-            struct stat buffer;
-            if( stat( filename.c_str(), &buffer ) == 0 ) {
-                // Continue with the old log file if it's smaller than 1 MiB
-                if( buffer.st_size >= 1024 * 1024 ) {
-                    rename_failed = !rename_file( filename, oldfile );
-                }
+            // Continue with the old log file if it's smaller than 1 MiB
+            namespace fs = std::filesystem;
+            if( fs::exists( fs::path( filename ) )
+                && fs::file_size( fs::path( filename ) ) >= 1024 * 1024 ) {
+                std::error_code ec;
+                fs::rename( fs::path( filename ), fs::path( oldfile ), ec );
+                rename_failed = bool( ec );
             }
-            file = std::make_shared<cata::ofstream>(
-                       fs::u8path( filename ), std::ios::out | std::ios::app );
-            *file << "\n\n-----------------------------------------\n";
-            *file << get_time() << " : Starting log.";
-            DebugLog( D_INFO, D_MAIN ) << "Cataclysm DDA version " << getVersionString();
-            if( rename_failed ) {
-                DebugLog( D_ERROR, DC_ALL ) << "Moving the previous log file to "
-                                            << oldfile << " failed.\n"
-                                            << "Check the file permissions.  This "
-                                            "program will continue to use the "
-                                            "previous log file.";
-            }
+            file = std::make_shared<std::ofstream>(
+                       filename.generic_u8string(), std::ios::out | std::ios::app );
         }
         break;
         default:
@@ -703,7 +769,20 @@ void DebugFile::init( DebugOutput output_mode, const std::string &filename )
                       << std::endl;
             return;
     }
-
+#ifdef _WIN32
+    static auto keep_shared_ptr = file;
+    file = std::make_shared<OutputDebugStreamA>( file );
+#endif
+    *file << "\n\n-----------------------------------------\n";
+    *file << get_time() << " : Starting log.";
+    DebugLog( D_INFO, D_MAIN ) << "Cataclysm DDA version " << getVersionString();
+    if( rename_failed ) {
+        DebugLog( D_ERROR, DC_ALL ) << "Moving the previous log file to "
+                                    << oldfile << " failed.\n"
+                                    << "Check the file permissions.  This "
+                                    "program will continue to use the "
+                                    "previous log file.";
+    }
     if( str_buffer && file ) {
         *file << str_buffer->str();
     }
@@ -755,12 +834,12 @@ void setupDebug( DebugOutput output_mode )
         limitDebugClass( cl );
     }
 
-    debugFile().init( output_mode, PATH_INFO::debug() );
+    DebugFile::instance().init( output_mode, PATH_INFO::debug() );
 }
 
 void deinitDebug()
 {
-    debugFile().deinit();
+    DebugFile::instance().deinit();
 }
 
 // OStream Operators                                                {{{2
@@ -1072,7 +1151,7 @@ static void write_demangled_frame( std::ostream &out, const char *frame )
     } else {
         out << "\n    " << frame;
     }
-#elif defined(BSD)
+#elif defined(CATA_IS_ON_BSD)
     static const std::regex symbol_regex( R"(^(0x[a-f0-9]+)\s<(.*)\+(0?x?[a-f0-9]*)>\sat\s(.*)$)" );
     std::cmatch match_result;
     if( std::regex_search( frame, match_result, symbol_regex ) && match_result.size() == 5 ) {
@@ -1347,7 +1426,7 @@ void debug_write_backtrace( std::ostream &out )
     if( !addresses.empty() ) {
         call_addr2line( last_binary_name, addresses );
     }
-    free( funcNames );
+    free( funcNames );  // NOLINT( bugprone-multi-level-implicit-pointer-conversion )
 #   endif
 #endif
 }
@@ -1426,7 +1505,7 @@ std::ostream &DebugLog( DebugLevel lev, DebugClass cl )
     // Error are always logged, they are important,
     // Messages from D_MAIN come from debugmsg and are equally important.
     if( ( lev & debugLevel && cl & debugClass ) || lev & D_ERROR || cl & D_MAIN ) {
-        std::ostream &out = debugFile().get_file();
+        std::ostream &out = DebugFile::instance().get_file();
 
         output_repetitions( out );
 
@@ -1454,11 +1533,44 @@ std::ostream &DebugLog( DebugLevel lev, DebugClass cl )
         }
 #endif
 
+        out << std::unitbuf; // flush writes immediately
         return out;
     }
 
     static NullStream null_stream;
     return null_stream;
+}
+
+bool isDebuggerActive()
+{
+#if defined(_WIN32)
+    // From catch.hpp: both _MSVC_VER and __MINGW32__
+    return IsDebuggerPresent() != 0;
+#elif defined(__linux__)
+    // From catch.hpp:
+    // The standard POSIX way of detecting a debugger is to attempt to
+    // ptrace() the process, but this needs to be done from a child and not
+    // this process itself to still allow attaching to this process later
+    // if wanted, so is rather heavy. Under Linux we have the PID of the
+    // "debugger" (which doesn't need to be gdb, of course, it could also
+    // be strace, for example) in /proc/$PID/status, so just get it from
+    // there instead.
+    std::ifstream in( "/proc/self/status" );
+    for( std::string line; std::getline( in, line ); ) {
+        static const int PREFIX_LEN = 11;
+        //NOLINTNEXTLINE(cata-text-style)
+        if( line.compare( 0, PREFIX_LEN, "TracerPid:\t" ) == 0 ) {
+            // We're traced if the PID is not 0 and no other PID starts
+            // with 0 digit, so it's enough to check for just a single
+            // character.
+            return line.length() > PREFIX_LEN && line[PREFIX_LEN] != '0';
+        }
+    }
+
+    return false;
+#else
+    return false;
+#endif
 }
 
 std::string game_info::operating_system()
@@ -1485,7 +1597,7 @@ std::string game_info::operating_system()
     /* OSX */
     return "MacOs";
 #endif // TARGET_IPHONE_SIMULATOR
-#elif defined(BSD)
+#elif defined(CATA_IS_ON_BSD)
     return "BSD";
 #else
     return "Unix";
@@ -1495,7 +1607,15 @@ std::string game_info::operating_system()
 #endif
 }
 
-#if !defined(__CYGWIN__) && !defined (__ANDROID__) && ( defined (__linux__) || defined(unix) || defined(__unix__) || defined(__unix) || ( defined(__APPLE__) && defined(__MACH__) ) || defined(BSD) ) // linux; unix; MacOs; BSD
+#if !defined(EMSCRIPTEN) && !defined(__CYGWIN__) && !defined (__ANDROID__) && ( defined (__linux__) || defined(unix) || defined(__unix__) || defined(__unix) || ( defined(__APPLE__) && defined(__MACH__) ) || defined(CATA_IS_ON_BSD) ) // linux; unix; MacOs; BSD
+class FILEDeleter
+{
+    public:
+        void operator()( FILE *f ) const noexcept {
+            pclose( f );
+        }
+};
+
 /** Execute a command with the shell by using `popen()`.
  * @param command The full command to execute.
  * @note The output buffer is limited to 512 characters.
@@ -1506,7 +1626,7 @@ static std::string shell_exec( const std::string &command )
     std::vector<char> buffer( 512 );
     std::string output;
     try {
-        std::unique_ptr<FILE, decltype( &pclose )> pipe( popen( command.c_str(), "r" ), pclose );
+        std::unique_ptr<FILE, FILEDeleter> pipe( popen( command.c_str(), "r" ) );
         if( pipe ) {
             while( fgets( buffer.data(), buffer.size(), pipe.get() ) != nullptr ) {
                 output += buffer.data();
@@ -1559,7 +1679,7 @@ static std::string android_version()
     return output;
 }
 
-#elif defined(BSD)
+#elif defined(CATA_IS_ON_BSD)
 
 /** Get a precise version number for BSD systems.
  * @note The code shells-out to call `uname -a`.
@@ -1603,7 +1723,7 @@ static std::string linux_version()
     return output;
 }
 
-#elif defined(__APPLE__) && defined(__MACH__) && !defined(BSD)
+#elif defined(__APPLE__) && defined(__MACH__) && !defined(CATA_IS_ON_BSD)
 
 /** Get a precise version number for MacOs systems.
  * @note The code shells-out to call `sw_vers` with various options.
@@ -1746,11 +1866,11 @@ std::string game_info::operating_system_version()
 {
 #if defined(__ANDROID__)
     return android_version();
-#elif defined(BSD)
+#elif defined(CATA_IS_ON_BSD)
     return bsd_version();
 #elif defined(__linux__)
     return linux_version();
-#elif defined(__APPLE__) && defined(__MACH__) && !defined(BSD)
+#elif defined(__APPLE__) && defined(__MACH__) && !defined(CATA_IS_ON_BSD)
     return mac_os_version();
 #elif defined(_WIN32)
     return windows_version();

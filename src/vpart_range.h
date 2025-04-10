@@ -2,17 +2,15 @@
 #ifndef CATA_SRC_VPART_RANGE_H
 #define CATA_SRC_VPART_RANGE_H
 
-#include <functional>
 #include <cstddef>
+#include <functional>
 #include <iterator>
-#include <new>
 #include <optional>
-#include <type_traits>
+#include <utility>
 
-#include "cata_assert.h"
-#include "vehicle.h"
 #include "vpart_position.h"
 
+class vehicle;
 enum class part_status_flag : int;
 
 /**
@@ -79,9 +77,9 @@ class vehicle_part_iterator
         }
 };
 
-namespace std
-{
-template<class T> struct iterator_traits<vehicle_part_iterator<T>> {
+template<class T>
+// NOLINTNEXTLINE(cert-dcl58-cpp)
+struct std::iterator_traits<vehicle_part_iterator<T>> {
     using difference_type = size_t;
     using value_type = vpart_reference;
     // TODO: maybe change into random access iterator? This requires adding
@@ -90,7 +88,6 @@ template<class T> struct iterator_traits<vehicle_part_iterator<T>> {
     using pointer = const vpart_reference *;
     using iterator_category = std::forward_iterator_tag;
 };
-} // namespace std
 
 /**
  * The generic range, it misses the `bool contained(size_t)` function that is

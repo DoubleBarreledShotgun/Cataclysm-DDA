@@ -1,13 +1,10 @@
-#include "cata_catch.h"
-
-#include <array>
-#include <cstddef>
-#include <sstream>
-#include <vector>
+#include <string>
 
 #include "calendar.h"
-#include "enums.h"
+#include "cata_catch.h"
+#include "character.h"
 #include "npc.h"
+#include "type_id.h"
 
 static const efftype_id effect_lying_down( "lying_down" );
 static const efftype_id effect_npc_suspend( "npc_suspend" );
@@ -60,6 +57,7 @@ static void daily_routine( npc &dude, int numb_stam_burn, int vitamin_amount,
 TEST_CASE( "healthy_lifestyle", "[health]" )
 {
     standard_npc dude( "healthy lifestyle" );
+    dude.set_stored_kcal( dude.get_healthy_kcal() );
 
     int init_lifestyle = dude.get_lifestyle();
 
@@ -75,6 +73,7 @@ TEST_CASE( "healthy_lifestyle", "[health]" )
 TEST_CASE( "unhealthy_lifestyle", "[health]" )
 {
     standard_npc dude( "unhealthy lifestyle" );
+    dude.set_stored_kcal( dude.get_healthy_kcal() );
 
     int init_lifestyle = dude.get_lifestyle();
 

@@ -2,26 +2,29 @@
 #ifndef CATA_SRC_MONSTERGENERATOR_H
 #define CATA_SRC_MONSTERGENERATOR_H
 
-#include <array>
-#include <iosfwd>
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "enum_bitset.h"
-#include "enums.h"
-#include "generic_factory.h"
 #include "mattack_common.h"
 #include "mtype.h"
 #include "pimpl.h"
-#include "translations.h"
+#include "translation.h"
 #include "type_id.h"
 
 class Creature;
 class JsonObject;
 class monster;
+enum class phase_id : int;
 struct dealt_projectile_attack;
+template <typename T> class generic_factory;
 
 using mon_action_death  = void ( * )( monster & );
 using mon_action_attack = bool ( * )( monster * );
@@ -33,7 +36,7 @@ struct species_type {
     bool was_loaded = false;
     translation description;
     translation footsteps;
-    enum_bitset<m_flag> flags;
+    std::set<mon_flag_str_id> flags;
     enum_bitset<mon_trigger> anger;
     enum_bitset<mon_trigger> fear;
     enum_bitset<mon_trigger> placate;
@@ -70,6 +73,8 @@ class MonsterGenerator
         // combines mtype and species information, sets bitflags
         void finalize_mtypes();
 
+        mtype generate_fake_pseudo_dormant_monster( const mtype &mon );
+
         void check_monster_definitions() const;
 
         std::optional<mon_action_death> get_death_function( const std::string &f ) const;
@@ -78,7 +83,6 @@ class MonsterGenerator
         friend struct mtype;
         friend struct species_type;
         friend class mattack_actor;
-        std::array<int, m_flag::MF_MAX> m_flag_usage_stats;
 
     private:
         MonsterGenerator();

@@ -1,22 +1,29 @@
-#include <iosfwd>
-#include <list>
+#include <initializer_list>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "activity_actor_definitions.h"
 #include "avatar.h"
-#include "activity_actor_definitions.h"
-#include "activity_actor_definitions.h"
+#include "bodypart.h"
 #include "calendar.h"
 #include "cata_catch.h"
 #include "character.h"
+#include "character_attire.h"
+#include "coordinates.h"
 #include "item.h"
+#include "item_location.h"
 #include "itype.h"
-#include "morale_types.h"
+#include "map.h"
+#include "map_helpers.h"
+#include "player_activity.h"
 #include "player_helpers.h"
-#include "skill.h"
+#include "pocket_type.h"
+#include "ret_val.h"
 #include "type_id.h"
 #include "value_ptr.h"
+
+class SkillLevel;
 
 static const activity_id ACT_READ( "ACT_READ" );
 
@@ -24,7 +31,21 @@ static const efftype_id effect_darkness( "darkness" );
 
 static const flag_id json_flag_INSPIRATIONAL( "INSPIRATIONAL" );
 
+static const itype_id itype_atomic_lamp( "atomic_lamp" );
+static const itype_id itype_backpack( "backpack" );
+static const itype_id itype_child_book( "child_book" );
+static const itype_id itype_holybook_pastafarian( "holybook_pastafarian" );
+static const itype_id itype_mag_throwing( "mag_throwing" );
+static const itype_id itype_novel_western( "novel_western" );
+static const itype_id itype_recipe_alpha( "recipe_alpha" );
+static const itype_id itype_sheet_cotton( "sheet_cotton" );
+static const itype_id itype_test_battery_disposable( "test_battery_disposable" );
+static const itype_id itype_test_ebook_reader( "test_ebook_reader" );
+static const itype_id itype_test_textbook_fabrication( "test_textbook_fabrication" );
+
 static const limb_score_id limb_score_vision( "vision" );
+
+static const morale_type morale_feeling_bad( "morale_feeling_bad" );
 
 static const skill_id skill_chemistry( "chemistry" );
 
@@ -34,9 +55,11 @@ static const trait_id trait_ILLITERATE( "ILLITERATE" );
 static const trait_id trait_LOVES_BOOKS( "LOVES_BOOKS" );
 static const trait_id trait_SPIRITUAL( "SPIRITUAL" );
 
-TEST_CASE( "clearing identified books", "[reading][book][identify][clear]" )
+
+
+TEST_CASE( "clearing_identified_books", "[reading][book][identify][clear]" )
 {
-    item book( "child_book" );
+    item book( itype_child_book );
     SECTION( "using local avatar" ) {
         avatar dummy;
         dummy.identify( book );
@@ -51,15 +74,15 @@ TEST_CASE( "clearing identified books", "[reading][book][identify][clear]" )
     }
 }
 
-TEST_CASE( "identifying unread books", "[reading][book][identify]" )
+TEST_CASE( "identifying_unread_books", "[reading][book][identify]" )
 {
     clear_avatar();
     Character &dummy = get_avatar();
-    dummy.worn.wear_item( dummy, item( "backpack" ), false, false );
+    dummy.worn.wear_item( dummy, item( itype_backpack ), false, false );
 
     GIVEN( "character has some unidentified books" ) {
-        item_location book1 = dummy.i_add( item( "novel_western" ) );
-        item_location book2 = dummy.i_add( item( "mag_throwing" ) );
+        item_location book1 = dummy.i_add( item( itype_novel_western ) );
+        item_location book2 = dummy.i_add( item( itype_mag_throwing ) );
 
         REQUIRE_FALSE( dummy.has_identified( book1->typeId() ) );
         REQUIRE_FALSE( dummy.has_identified( book2->typeId() ) );
@@ -76,15 +99,15 @@ TEST_CASE( "identifying unread books", "[reading][book][identify]" )
     }
 }
 
-TEST_CASE( "reading a book for fun", "[reading][book][fun]" )
+TEST_CASE( "reading_a_book_for_fun", "[reading][book][fun]" )
 {
     clear_avatar();
     Character &dummy = get_avatar();
     dummy.set_body();
-    dummy.worn.wear_item( dummy, item( "backpack" ), false, false );
+    dummy.worn.wear_item( dummy, item( itype_backpack ), false, false );
 
     GIVEN( "a fun book" ) {
-        item_location book = dummy.i_add( item( "novel_western" ) );
+        item_location book = dummy.i_add( item( itype_novel_western ) );
         REQUIRE( book->type->book );
         REQUIRE( book->type->book->fun > 0 );
         int book_fun = book->type->book->fun;
@@ -121,7 +144,7 @@ TEST_CASE( "reading a book for fun", "[reading][book][fun]" )
     }
 
     GIVEN( "a fun book that is also inspirational" ) {
-        item_location book = dummy.i_add( item( "holybook_pastafarian" ) );
+        item_location book = dummy.i_add( item( itype_holybook_pastafarian ) );
         REQUIRE( book->has_flag( json_flag_INSPIRATIONAL ) );
         REQUIRE( book->type->book );
         REQUIRE( book->type->book->fun > 0 );
@@ -148,11 +171,11 @@ TEST_CASE( "reading a book for fun", "[reading][book][fun]" )
     }
 }
 
-TEST_CASE( "character reading speed", "[reading][character][speed]" )
+TEST_CASE( "character_reading_speed", "[reading][character][speed]" )
 {
     clear_avatar();
     Character &dummy = get_avatar();
-    dummy.worn.wear_item( dummy, item( "backpack" ), false, false );
+    dummy.worn.wear_item( dummy, item( itype_backpack ), false, false );
 
     // Note: read_speed() returns number of moves;
     // 6000 == 60 seconds
@@ -169,11 +192,11 @@ TEST_CASE( "character reading speed", "[reading][character][speed]" )
 
         THEN( "reading speed gets slower as intelligence decreases" ) {
             dummy.int_max = 7;
-            CHECK( dummy.read_speed() * 60 == 6300 );
+            CHECK( dummy.read_speed() * 60 == 6180 );
             dummy.int_max = 6;
-            CHECK( dummy.read_speed() * 60 == 6600 );
+            CHECK( dummy.read_speed() * 60 == 6480 );
             dummy.int_max = 5;
-            CHECK( dummy.read_speed() * 60 == 6900 );
+            CHECK( dummy.read_speed() * 60 == 6780 );
             dummy.int_max = 4;
             CHECK( dummy.read_speed() * 60 == 7200 );
         }
@@ -185,16 +208,16 @@ TEST_CASE( "character reading speed", "[reading][character][speed]" )
             dummy.int_max = 9;
             CHECK( dummy.read_speed() * 60 == 5700 );
             dummy.int_max = 10;
-            CHECK( dummy.read_speed() * 60 == 5400 );
+            CHECK( dummy.read_speed() * 60 == 5460 );
             dummy.int_max = 12;
-            CHECK( dummy.read_speed() * 60 == 4800 );
+            CHECK( dummy.read_speed() * 60 == 5100 );
             dummy.int_max = 14;
-            CHECK( dummy.read_speed() * 60 == 4200 );
+            CHECK( dummy.read_speed() * 60 == 4800 );
         }
     }
 }
 
-TEST_CASE( "estimated reading time for a book", "[reading][book][time]" )
+TEST_CASE( "estimated_reading_time_for_a_book", "[reading][book][time]" )
 {
     avatar dummy;
     //Give eyes to our dummy
@@ -202,12 +225,12 @@ TEST_CASE( "estimated reading time for a book", "[reading][book][time]" )
     REQUIRE( dummy.has_part( bodypart_id( "eyes" ) ) );
     REQUIRE( dummy.get_limb_score( limb_score_vision ) != 0 );
 
-    dummy.worn.wear_item( dummy, item( "backpack" ), false, false );
+    dummy.worn.wear_item( dummy, item( itype_backpack ), false, false );
 
     // Easy, medium, and hard books
-    item_location child = dummy.i_add( item( "child_book" ) );
-    item_location western = dummy.i_add( item( "novel_western" ) );
-    item_location alpha = dummy.i_add( item( "recipe_alpha" ) );
+    item_location child = dummy.i_add( item( itype_child_book ) );
+    item_location western = dummy.i_add( item( itype_novel_western ) );
+    item_location alpha = dummy.i_add( item( itype_recipe_alpha ) );
 
     // Ensure the books are actually books
     REQUIRE( child->type->book );
@@ -224,7 +247,7 @@ TEST_CASE( "estimated reading time for a book", "[reading][book][time]" )
         REQUIRE_FALSE( dummy.has_identified( western->typeId() ) );
 
         // Get some light
-        dummy.i_add( item( "atomic_lamp" ) );
+        dummy.i_add( item( itype_atomic_lamp ) );
         REQUIRE( dummy.fine_detail_vision_mod() == 1 );
 
         THEN( "identifying books takes 1/10th of the normal reading time" ) {
@@ -243,7 +266,7 @@ TEST_CASE( "estimated reading time for a book", "[reading][book][time]" )
         REQUIRE( dummy.has_identified( alpha->typeId() ) );
 
         // Get some light
-        dummy.i_add( item( "atomic_lamp" ) );
+        dummy.i_add( item( itype_atomic_lamp ) );
         REQUIRE( dummy.fine_detail_vision_mod() == 1 );
 
         WHEN( "player has average intelligence" ) {
@@ -263,7 +286,7 @@ TEST_CASE( "estimated reading time for a book", "[reading][book][time]" )
         WHEN( "player has below average intelligence" ) {
             dummy.int_max = 6;
             REQUIRE( dummy.get_int() == 6 );
-            REQUIRE( dummy.read_speed() * 60 == 6600 ); // 66s
+            REQUIRE( dummy.read_speed() * 60 == 6480 ); // 65s
 
             THEN( "they take longer than average to read any book" ) {
                 CHECK( dummy.time_to_read( *child, dummy ) > moves_child );
@@ -275,7 +298,7 @@ TEST_CASE( "estimated reading time for a book", "[reading][book][time]" )
         WHEN( "player has above average intelligence" ) {
             dummy.int_max = 10;
             REQUIRE( dummy.get_int() == 10 );
-            REQUIRE( dummy.read_speed() * 60 == 5400 ); // 54s
+            REQUIRE( dummy.read_speed() * 60 == 5460 ); // 55s
 
             THEN( "they take less time than average to read any book" ) {
                 CHECK( dummy.time_to_read( *child, dummy ) < moves_child );
@@ -286,34 +309,44 @@ TEST_CASE( "estimated reading time for a book", "[reading][book][time]" )
     }
 }
 
-TEST_CASE( "reasons for not being able to read", "[reading][reasons]" )
+TEST_CASE( "reasons_for_not_being_able_to_read", "[reading][reasons]" )
 {
-    avatar dummy;
+    clear_avatar();
+    clear_map();
+    Character &dummy = get_avatar();
     dummy.set_body();
-    dummy.worn.wear_item( dummy, item( "backpack" ), false, false );
+    dummy.worn.wear_item( dummy, item( itype_backpack ), false, false );
+    set_time_to_day();
     std::vector<std::string> reasons;
     std::vector<std::string> expect_reasons;
 
-    item_location child = dummy.i_add( item( "child_book" ) );
-    item_location western = dummy.i_add( item( "novel_western" ) );
-    item_location alpha = dummy.i_add( item( "recipe_alpha" ) );
+    item_location child = dummy.i_add( item( itype_child_book ) );
+    item_location western = dummy.i_add( item( itype_novel_western ) );
+    item_location alpha = dummy.i_add( item( itype_recipe_alpha ) );
 
     SECTION( "you cannot read what is not readable" ) {
-        item_location rag = dummy.i_add( item( "rag" ) );
-        REQUIRE_FALSE( rag->is_book() );
+        item_location sheet_cotton = dummy.i_add( item( itype_sheet_cotton ) );
+        REQUIRE_FALSE( sheet_cotton->is_book() );
 
-        CHECK( dummy.get_book_reader( *rag, reasons ) == nullptr );
-        expect_reasons = { "Your rag is not good reading material." };
+        CHECK( dummy.get_book_reader( *sheet_cotton, reasons ) == nullptr );
+        expect_reasons = { "Your cotton sheet is not good reading material." };
         CHECK( reasons == expect_reasons );
     }
 
     SECTION( "you cannot read in darkness" ) {
-        dummy.add_env_effect( effect_darkness, bodypart_id( "eyes" ), 3, 1_hours );
+        if( GENERATE( true, false ) ) {
+            dummy.add_env_effect( effect_darkness, bodypart_id( "eyes" ), 3, 1_hours );
+            CAPTURE( "darkness effect" );
+        } else {
+            set_time( calendar::turn - time_past_midnight( calendar::turn ) );
+            CAPTURE( "actual darkness" );
+        }
         REQUIRE( dummy.fine_detail_vision_mod() > 4 );
 
         CHECK( dummy.get_book_reader( *child, reasons ) == nullptr );
         expect_reasons = { "It's too dark to read!" };
         CHECK( reasons == expect_reasons );
+        set_time_to_day();
     }
 
     GIVEN( "some identified books and plenty of light" ) {
@@ -323,7 +356,7 @@ TEST_CASE( "reasons for not being able to read", "[reading][reasons]" )
         dummy.identify( *alpha );
 
         // Get some light
-        dummy.i_add( item( "atomic_lamp" ) );
+        dummy.i_add( item( itype_atomic_lamp ) );
         REQUIRE( dummy.fine_detail_vision_mod() == 1 );
 
         THEN( "you cannot read while illiterate" ) {
@@ -353,7 +386,7 @@ TEST_CASE( "reasons for not being able to read", "[reading][reasons]" )
         }
 
         THEN( "you cannot read boring books when your morale is too low" ) {
-            dummy.add_morale( MORALE_FEELING_BAD, -50, -100 );
+            dummy.add_morale( morale_feeling_bad, -50, -100 );
             REQUIRE_FALSE( dummy.has_morale_to_read() );
 
             CHECK( dummy.get_book_reader( *alpha, reasons ) == nullptr );
@@ -376,7 +409,7 @@ TEST_CASE( "reasons for not being able to read", "[reading][reasons]" )
     }
 }
 
-TEST_CASE( "determining book mastery", "[reading][book][mastery]" )
+TEST_CASE( "determining_book_mastery", "[reading][book][mastery]" )
 {
     static const auto book_has_skill = []( const item & book ) -> bool {
         REQUIRE( book.is_book() );
@@ -385,15 +418,15 @@ TEST_CASE( "determining book mastery", "[reading][book][mastery]" )
 
     avatar dummy;
     dummy.set_body();
-    dummy.worn.wear_item( dummy, item( "backpack" ), false, false );
+    dummy.worn.wear_item( dummy, item( itype_backpack ), false, false );
 
-    item_location child = dummy.i_add( item( "child_book" ) );
-    item_location alpha = dummy.i_add( item( "recipe_alpha" ) );
+    item_location child = dummy.i_add( item( itype_child_book ) );
+    item_location alpha = dummy.i_add( item( itype_recipe_alpha ) );
 
     SECTION( "you cannot determine mastery for non-book items" ) {
-        item_location rag = dummy.i_add( item( "rag" ) );
-        REQUIRE_FALSE( rag->is_book() );
-        CHECK( dummy.get_book_mastery( *rag ) == book_mastery::CANT_DETERMINE );
+        item_location sheet_cotton = dummy.i_add( item( itype_sheet_cotton ) );
+        REQUIRE_FALSE( sheet_cotton->is_book() );
+        CHECK( dummy.get_book_mastery( *sheet_cotton ) == book_mastery::CANT_DETERMINE );
     }
     SECTION( "you cannot determine mastery for unidentified books" ) {
         REQUIRE( alpha->is_book() );
@@ -431,14 +464,14 @@ TEST_CASE( "determining book mastery", "[reading][book][mastery]" )
     }
 }
 
-TEST_CASE( "reading a book for skill", "[reading][book][skill]" )
+TEST_CASE( "reading_a_book_for_skill", "[reading][book][skill]" )
 {
     clear_avatar();
     Character &dummy = get_avatar();
     dummy.set_body();
-    dummy.worn.wear_item( dummy, item( "backpack" ), false, false );
+    dummy.worn.wear_item( dummy, item( itype_backpack ), false, false );
 
-    item_location alpha = dummy.i_add( item( "recipe_alpha" ) );
+    item_location alpha = dummy.i_add( item( itype_recipe_alpha ) );
     REQUIRE( alpha->is_book() );
 
     dummy.identify( *alpha );
@@ -466,40 +499,28 @@ TEST_CASE( "reading a book for skill", "[reading][book][skill]" )
     }
 }
 
-TEST_CASE( "reading a book with an ebook reader", "[reading][book][ereader]" )
+static void test_ebook_is_reading( avatar &dummy, item_location ereader, item_location booklc )
 {
-    avatar &dummy = get_avatar();
-    clear_avatar();
+    THEN( "player can read the book" ) {
+        read_activity_actor actor( dummy.time_to_read( *booklc, dummy ), booklc, ereader, true );
+        dummy.activity = player_activity( actor );
 
-    WHEN( "reading a book" ) {
+        REQUIRE( ereader->ammo_remaining( ) == 100 );
 
-        dummy.worn.wear_item( dummy, item( "backpack" ), false, false );
-        dummy.i_add( item( "atomic_lamp" ) );
-        REQUIRE( dummy.fine_detail_vision_mod() == 1 );
+        dummy.activity.start_or_resume( dummy, false );
+        REQUIRE( dummy.activity.id() == ACT_READ );
 
-        item_location ereader = dummy.i_add( item( "test_ebook_reader" ) );
+        CHECK( ereader->ammo_remaining( ) == 99 );
 
-        item book{"test_textbook_fabrication"};
-        ereader->put_in( book, item_pocket::pocket_type::EBOOK );
+        dummy.activity.do_turn( dummy );
 
-        item battery( "test_battery_disposable" );
-        battery.ammo_set( battery.ammo_default(), 100 );
-        ereader->put_in( battery, item_pocket::pocket_type::MAGAZINE_WELL );
+        CHECK( dummy.activity.id() == ACT_READ );
 
-        THEN( "player can read the book" ) {
-
-            item_location booklc{dummy, &book};
-            read_activity_actor actor( dummy.time_to_read( *booklc, dummy ), booklc, ereader, true );
-            dummy.activity = player_activity( actor );
-
-            dummy.activity.start_or_resume( dummy, false );
-            REQUIRE( dummy.activity.id() == ACT_READ );
-            dummy.activity.do_turn( dummy );
-
-            CHECK( dummy.activity.id() == ACT_READ );
+        AND_THEN( "ereader has spent a charge while reading" ) {
+            CHECK( ereader->ammo_remaining( ) == 98 );
 
             AND_THEN( "ereader runs out of battery" ) {
-                ereader->ammo_consume( 100, dummy.pos(), &dummy );
+                ereader->ammo_consume( ereader->ammo_remaining( ), dummy.pos_bub(), &dummy );
                 dummy.activity.do_turn( dummy );
 
                 THEN( "reading stops" ) {
@@ -509,3 +530,49 @@ TEST_CASE( "reading a book with an ebook reader", "[reading][book][ereader]" )
         }
     }
 }
+
+TEST_CASE( "reading_a_book_with_an_ebook_reader", "[reading][book][ereader]" )
+{
+    avatar &dummy = get_avatar();
+    clear_avatar();
+    item book( itype_test_textbook_fabrication );
+
+    WHEN( "having a book int the inventory" ) {
+
+        dummy.worn.wear_item( dummy, item( itype_backpack ), false, false );
+        dummy.i_add( item( itype_atomic_lamp ) );
+        REQUIRE( dummy.fine_detail_vision_mod() == 1 );
+
+        item_location ereader = dummy.i_add( item( itype_test_ebook_reader ) );
+
+        ereader->put_in( book, pocket_type::E_FILE_STORAGE );
+
+        item battery( itype_test_battery_disposable );
+        battery.ammo_set( battery.ammo_default(), 100 );
+        ereader->put_in( battery, pocket_type::MAGAZINE_WELL );
+        item_location booklc{dummy, &book};
+
+        test_ebook_is_reading( dummy, ereader, booklc );
+
+
+    }
+
+    GIVEN( "a book nearby" ) {
+        map &here = get_map();
+        tripoint_bub_ms pos = dummy.pos_bub();
+        dummy.i_add( item( itype_atomic_lamp ) );
+        REQUIRE( dummy.fine_detail_vision_mod() == 1 );
+
+        item_location ereader = here.add_item_or_charges_ret_loc( pos, item( itype_test_ebook_reader ) );
+
+        ereader->put_in( book, pocket_type::E_FILE_STORAGE );
+
+        item battery( itype_test_battery_disposable );
+        battery.ammo_set( battery.ammo_default(), 100 );
+        ereader->put_in( battery, pocket_type::MAGAZINE_WELL );
+
+        item_location booklc{ereader, &book};
+        test_ebook_is_reading( dummy, ereader, booklc );
+    }
+}
+

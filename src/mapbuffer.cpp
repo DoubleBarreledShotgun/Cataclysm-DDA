@@ -2,33 +2,37 @@
 
 #include <chrono>
 #include <exception>
+#include <filesystem>
 #include <functional>
-#include <ratio>
 #include <set>
 #include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "cata_path.h"
 #include "cata_utility.h"
-#include "coordinate_conversions.h"
 #include "debug.h"
 #include "filesystem.h"
-#include "game_constants.h"
+#include "flexbuffer_json.h"
+#include "input.h"
 #include "json.h"
 #include "map.h"
 #include "output.h"
 #include "overmapbuffer.h"
 #include "path_info.h"
+#include "point.h"
 #include "popup.h"
 #include "string_formatter.h"
 #include "submap.h"
 #include "translations.h"
+#include "type_id.h"
 #include "ui_manager.h"
 
 #define dbg(x) DebugLog((x),D_MAP) << __FILE__ << ":" << __LINE__ << ": "
 
 class game;
+
 // NOLINTNEXTLINE(cata-static-declarations)
 extern std::unique_ptr<game> g;
 // NOLINTNEXTLINE(cata-static-declarations)
@@ -42,7 +46,7 @@ static cata_path find_quad_path( const cata_path &dirname, const tripoint_abs_om
 static cata_path find_dirname( const tripoint_abs_omt &om_addr )
 {
     const tripoint_abs_seg segment_addr = project_to<coords::seg>( om_addr );
-    return PATH_INFO::world_base_save_path_path() / "maps" / string_format( "%d.%d.%d",
+    return PATH_INFO::world_base_save_path() / "maps" / string_format( "%d.%d.%d",
             segment_addr.x(),
             segment_addr.y(), segment_addr.z() );
 }
@@ -121,9 +125,43 @@ submap *mapbuffer::lookup_submap( const tripoint_abs_sm &p )
     return iter->second.get();
 }
 
+bool mapbuffer::submap_exists( const tripoint_abs_sm &p )
+{
+    // Could so with a second check against a std::unordered_set<tripoint_abs_sm> of already checked existing but not loaded submaps before resorting to unserializing?
+    const auto iter = submaps.find( p );
+    if( iter == submaps.end() ) {
+        try {
+            return unserialize_submaps( p );
+        } catch( const std::exception &err ) {
+            debugmsg( "Failed to load submap %s: %s", p.to_string(), err.what() );
+        }
+        return false;
+    }
+
+    return true;
+}
+
+bool mapbuffer::submap_exists_approx( const tripoint_abs_sm &p )
+{
+    const auto iter = submaps.find( p );
+    if( iter == submaps.end() ) {
+        try {
+            const tripoint_abs_omt om_addr = project_to<coords::omt>( p );
+            const cata_path dirname = find_dirname( om_addr );
+            cata_path quad_path = find_quad_path( dirname, om_addr );
+            return file_exist( quad_path );
+        } catch( const std::exception &err ) {
+            debugmsg( "Failed to load submap %s: %s", p.to_string(), err.what() );
+        }
+        return false;
+    }
+
+    return true;
+}
+
 void mapbuffer::save( bool delete_after_save )
 {
-    assure_dir_exist( PATH_INFO::world_base_save_path() + "/maps" );
+    assure_dir_exist( PATH_INFO::world_base_save_path() / "maps" );
 
     int num_saved_submaps = 0;
     int num_total_submaps = submaps.size();
@@ -181,21 +219,29 @@ void mapbuffer::save_quad(
     const cata_path &dirname, const cata_path &filename, const tripoint_abs_omt &om_addr,
     std::list<tripoint_abs_sm> &submaps_to_delete, bool delete_after_save )
 {
-    std::vector<point> offsets;
+    std::vector<point_rel_sm> offsets;
     std::vector<tripoint_abs_sm> submap_addrs;
-    offsets.push_back( point_zero );
-    offsets.push_back( point_south );
-    offsets.push_back( point_east );
-    offsets.push_back( point_south_east );
+    offsets.reserve( 4 );
+    submap_addrs.reserve( 4 );
+    offsets.push_back( point_rel_sm::zero );
+    offsets.push_back( point_rel_sm::south );
+    offsets.push_back( point_rel_sm::east );
+    offsets.push_back( point_rel_sm::south_east );
 
     bool all_uniform = true;
-    for( point &offsets_offset : offsets ) {
+    bool reverted_to_uniform = false;
+    bool const file_exists = std::filesystem::exists( filename.get_unrelative_path() );
+    for( point_rel_sm &offsets_offset : offsets ) {
         tripoint_abs_sm submap_addr = project_to<coords::sm>( om_addr );
-        submap_addr += offsets_offset;
+        submap_addr += offsets_offset.raw(); // TODO: Make += etc. available to relative parameters as well.
         submap_addrs.push_back( submap_addr );
         submap *sm = submaps[submap_addr].get();
-        if( sm != nullptr && !sm->is_uniform() ) {
-            all_uniform = false;
+        if( sm != nullptr ) {
+            if( !sm->is_uniform() ) {
+                all_uniform = false;
+            } else if( sm->reverted ) {
+                reverted_to_uniform = file_exists;
+            }
         }
     }
 
@@ -209,7 +255,11 @@ void mapbuffer::save_quad(
             }
         }
 
-        return;
+        // deleting the file might fail on some platforms in some edge cases so force serialize this
+        // uniform quad
+        if( !reverted_to_uniform ) {
+            return;
+        }
     }
 
     // Don't create the directory if it would be empty
@@ -250,6 +300,10 @@ void mapbuffer::save_quad(
 
         jsout.end_array();
     } );
+
+    if( all_uniform && reverted_to_uniform ) {
+        std::filesystem::remove( filename.get_unrelative_path() );
+    }
 }
 
 // We're reading in way too many entities here to mess around with creating sub-objects and
@@ -275,20 +329,21 @@ submap *mapbuffer::unserialize_submaps( const tripoint_abs_sm &p )
         }
     }
 
-    if( !read_from_file_optional_json( quad_path, [this]( const JsonValue & jsin ) {
-    deserialize( jsin );
-    } ) ) {
-        // If it doesn't exist, trigger generating it.
-        return nullptr;
+    const bool read = read_from_file_optional_json( quad_path, [this]( const JsonValue & jsin ) {
+        deserialize( jsin );
+    } );
+
+    if( read ) {
+        return submaps[p].get();
     }
-    // fill in uniform submaps that were not serialized
+
+    // fill in uniform submaps that were not serialized. Note that failure if it's not
+    // uniform is OK and results in a return of nullptr.
     oter_id const oid = overmap_buffer.ter( om_addr );
-    generate_uniform_omt( project_to<coords::sm>( om_addr ), oid );
-    if( submaps.count( p ) == 0 ) {
-        debugmsg( "file %s did not contain the expected submap %s for non-uniform terrain %s",
-                  quad_path.generic_u8string(), p.to_string(), oid.id().str() );
+    if( !generate_uniform_omt( project_to<coords::sm>( om_addr ), oid ) ) {
         return nullptr;
     }
+
     return submaps[ p ].get();
 }
 

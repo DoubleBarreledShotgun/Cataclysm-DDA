@@ -2,6 +2,8 @@
 #ifndef CATA_SRC_FLEXBUFFER_JSON_INL_H
 #define CATA_SRC_FLEXBUFFER_JSON_INL_H
 
+// IWYU pragma: private, include "flexbuffer_json.h"
+
 #include <optional>
 #include <string>
 #include <type_traits>
@@ -111,7 +113,7 @@ inline JsonValue::operator std::string() const
     if( json_.IsString() ) {
         return json_.AsString().str();
     }
-    throw_error( 0, "Expected a string, got a " + std::to_string( json_.GetType() ) );
+    throw_error( "Expected a string, got " + flexbuffer_type_to_string( json_.GetType() ) );
 }
 
 inline JsonValue::operator int() const
@@ -119,7 +121,7 @@ inline JsonValue::operator int() const
     if( json_.IsNumeric() ) {
         return static_cast<int>( json_.AsInt64() );
     }
-    throw_error( 0, "Expected an int, got a " + std::to_string( json_.GetType() ) );
+    throw_error( "Expected an int, got " + flexbuffer_type_to_string( json_.GetType() ) );
 }
 
 inline JsonValue::operator int64_t() const
@@ -127,7 +129,7 @@ inline JsonValue::operator int64_t() const
     if( json_.IsNumeric() ) {
         return static_cast<int64_t>( json_.AsInt64() );
     }
-    throw_error( 0, "Expected an int64_t, got a " + std::to_string( json_.GetType() ) );
+    throw_error( "Expected an int64_t, got " + flexbuffer_type_to_string( json_.GetType() ) );
 }
 
 inline JsonValue::operator uint64_t() const
@@ -140,7 +142,7 @@ inline JsonValue::operator uint64_t() const
         }
         throw_error( "uint64_t value out of range" );
     }
-    throw_error( "Expected a uint64_t, got a " + std::to_string( json_.GetType() ) );
+    throw_error( "Expected a uint64_t, got " + flexbuffer_type_to_string( json_.GetType() ) );
 }
 
 inline JsonValue::operator unsigned() const
@@ -153,7 +155,7 @@ inline JsonValue::operator unsigned() const
         }
         throw_error( "unsigned int value out of range" );
     }
-    throw_error( "Expected an int, got a " + std::to_string( json_.GetType() ) );
+    throw_error( "Expected an uint32_t, got " + flexbuffer_type_to_string( json_.GetType() ) );
 }
 
 inline JsonValue::operator bool() const
@@ -161,7 +163,7 @@ inline JsonValue::operator bool() const
     if( json_.IsBool() ) {
         return json_.AsBool();
     }
-    throw_error( "Expected a bool, got a " + std::to_string( json_.GetType() ) );
+    throw_error( "Expected a bool, got " + flexbuffer_type_to_string( json_.GetType() ) );
 }
 
 inline JsonValue::operator double() const
@@ -169,7 +171,7 @@ inline JsonValue::operator double() const
     if( json_.IsNumeric() ) {
         return json_.AsDouble();
     }
-    throw_error( "Expected a double, got a " + std::to_string( json_.GetType() ) );
+    throw_error( "Expected a double, got " + flexbuffer_type_to_string( json_.GetType() ) );
 }
 
 inline JsonValue::operator JsonObject() const
@@ -181,7 +183,8 @@ inline JsonValue::operator JsonObject() const
     if( json_.IsMap() ) {
         return JsonObject( root_, flexbuffer( json_ ), std::move( new_path ) );
     }
-    throw_error( new_path, 0, "Expected an object, got a " + std::to_string( json_.GetType() ) );
+    throw_error( new_path, 0, "Expected an object, got " +
+                 flexbuffer_type_to_string( json_.GetType() ) );
 }
 
 inline JsonValue::operator JsonArray() const
@@ -193,7 +196,8 @@ inline JsonValue::operator JsonArray() const
     if( json_.IsAnyVector() && !json_.IsMap() ) {
         return JsonArray( root_, flexbuffer( json_ ), std::move( new_path ) );
     }
-    throw_error( new_path, 0, "Expected an array, got a " + std::to_string( json_.GetType() ) );
+    throw_error( new_path, 0, "Expected an array, got " +
+                 flexbuffer_type_to_string( json_.GetType() ) );
 }
 
 inline bool JsonValue::test_string() const
@@ -324,7 +328,7 @@ auto JsonValue::read( T &v, bool throw_on_error ) const -> decltype( v.deseriali
     }
 }
 
-template<typename T, std::enable_if_t<std::is_enum<T>::value, int>>
+template<typename T, std::enable_if_t<std::is_enum_v<T>, int>>
 bool JsonValue::read( T &val, bool throw_on_error ) const
 {
     int i;
@@ -367,8 +371,8 @@ bool JsonValue::read( std::pair<T, U> &p, bool throw_on_error ) const
 }
 
 // array ~> vector, deque, list
-template < typename T, typename std::enable_if <
-               !std::is_same<void, typename T::value_type>::value >::type * >
+template < typename T, std::enable_if_t <
+               !std::is_same_v<void, typename T::value_type> > * >
 auto JsonValue::read( T &v, bool throw_on_error ) const -> decltype( v.front(), true )
 {
     if( !test_array() ) {
@@ -426,8 +430,8 @@ bool JsonValue::read( std::array<T, N> &v, bool throw_on_error ) const
 
 // object ~> containers with matching key_type and value_type
 // set, unordered_set ~> object
-template <typename T, typename std::enable_if<
-              std::is_same<typename T::key_type, typename T::value_type>::value>::type *>
+template <typename T, std::enable_if_t<
+              std::is_same_v<typename T::key_type, typename T::value_type>> *>
 bool JsonValue::read( T &v, bool throw_on_error ) const
 {
     if( !test_array() ) {
@@ -483,7 +487,7 @@ bool JsonValue::read( enum_bitset<T> &v, bool throw_on_error ) const
 
 // special case for colony<item> as it supports RLE
 // see corresponding `write` for details
-template <typename T, std::enable_if_t<std::is_same<T, item>::value>* >
+template <typename T, std::enable_if_t<std::is_same_v<T, item>>* >
 bool JsonValue::read( cata::colony<T> &v, bool throw_on_error ) const
 {
     if( !test_array() ) {
@@ -531,7 +535,7 @@ bool JsonValue::read( cata::colony<T> &v, bool throw_on_error ) const
 // special case for colony as it uses `insert()` instead of `push_back()`
 // and therefore doesn't fit with vector/deque/list
 // for colony of items there is another specialization with RLE
-template < typename T, std::enable_if_t < !std::is_same<T, item>::value > * >
+template < typename T, std::enable_if_t < !std::is_same_v<T, item> > * >
 bool JsonValue::read( cata::colony<T> &v, bool throw_on_error ) const
 {
     if( !test_array() ) {
@@ -557,8 +561,8 @@ bool JsonValue::read( cata::colony<T> &v, bool throw_on_error ) const
 
 // object ~> containers with unmatching key_type and value_type
 // map, unordered_map ~> object
-template < typename T, typename std::enable_if <
-               !std::is_same<typename T::key_type, typename T::value_type>::value >::type * >
+template < typename T, std::enable_if_t <
+               !std::is_same_v<typename T::key_type, typename T::value_type> > * >
 bool JsonValue::read( T &m, bool throw_on_error ) const
 {
     if( !test_object() ) {
@@ -585,8 +589,8 @@ bool JsonValue::read( T &m, bool throw_on_error ) const
 }
 
 // array ~> vector, deque, list
-template < typename T, typename std::enable_if <
-               !std::is_same<void, typename T::value_type>::value >::type * >
+template < typename T, std::enable_if_t <
+               !std::is_same_v<void, typename T::value_type> > * >
 auto JsonArray::read( T &v, bool throw_on_error ) const -> decltype( v.front(), true )
 {
     try {
@@ -817,13 +821,13 @@ inline std::string JsonObject::get_string( const char *key ) const
     return get_member( key );
 }
 
-template<typename T, typename std::enable_if_t<std::is_convertible<T, std::string>::value>*>
+template<typename T, typename std::enable_if_t<std::is_convertible_v<T, std::string>>*>
 std::string JsonObject::get_string( const std::string &key, T &&fallback ) const
 {
     return get_string( key.c_str(), std::forward<T>( fallback ) );
 }
 
-template<typename T, typename std::enable_if_t<std::is_convertible<T, std::string>::value>*>
+template<typename T, typename std::enable_if_t<std::is_convertible_v<T, std::string>>*>
 std::string JsonObject::get_string( const char *key, T &&fallback ) const
 {
     size_t idx = 0;
@@ -935,6 +939,19 @@ inline std::vector<std::string> JsonObject::get_as_string_array( const std::stri
         }
     } else {
         ret.emplace_back( get_string( name ) );
+    }
+    return ret;
+}
+inline std::set<std::string> JsonObject::get_as_string_set( const std::string &name ) const
+{
+    std::set<std::string> ret;
+    if( has_array( name ) ) {
+        JsonArray ja = get_array( name );
+        for( JsonValue jv : get_array( name ) ) {
+            ret.insert( jv );
+        }
+    } else if( has_string( name ) ) {
+        ret.insert( get_string( name ) );
     }
     return ret;
 }

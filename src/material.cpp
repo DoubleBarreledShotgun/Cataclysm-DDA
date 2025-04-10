@@ -1,16 +1,16 @@
 #include "material.h"
 
 #include <algorithm>
-#include <iterator>
+#include <cmath>
 #include <map>
 #include <set>
+#include <unordered_map>
 
 #include "assign.h"
-#include "calendar.h"
 #include "debug.h"
+#include "flexbuffer_json.h"
 #include "generic_factory.h"
 #include "item.h"
-#include "json.h"
 #include "make_static.h"
 
 namespace
@@ -87,7 +87,7 @@ void material_type::load( const JsonObject &jsobj, const std::string_view )
         JsonObject jo = jsobj.get_object( "resist" );
         _resistances = load_resistances_instance( jo );
         for( const JsonMember &jmemb : jo ) {
-            _res_was_loaded.emplace_back( damage_type_id( jmemb.name() ) );
+            _res_was_loaded.emplace_back( jmemb.name() );
         }
     }
 
@@ -96,6 +96,8 @@ void material_type::load( const JsonObject &jsobj, const std::string_view )
     mandatory( jsobj, was_loaded, "density", _density );
 
     optional( jsobj, was_loaded, "sheet_thickness", _sheet_thickness );
+
+    optional( jsobj, was_loaded, "repair_difficulty", _repair_difficulty );
 
     optional( jsobj, was_loaded, "wind_resist", _wind_resist );
     optional( jsobj, was_loaded, "specific_heat_liquid", _specific_heat_liquid );
@@ -107,7 +109,6 @@ void material_type::load( const JsonObject &jsobj, const std::string_view )
 
     assign( jsobj, "salvaged_into", _salvaged_into );
     optional( jsobj, was_loaded, "repaired_with", _repaired_with, itype_id::NULL_ID() );
-    optional( jsobj, was_loaded, "edible", _edible, false );
     optional( jsobj, was_loaded, "rotting", _rotting, false );
     optional( jsobj, was_loaded, "soft", _soft, false );
     optional( jsobj, was_loaded, "uncomfortable", _uncomfortable, false );
@@ -143,11 +144,10 @@ void material_type::load( const JsonObject &jsobj, const std::string_view )
 void material_type::finalize_all()
 {
     material_data.finalize();
-}
-
-void material_type::finalize()
-{
-    finalize_damage_map( _resistances.resist_vals );
+    for( const material_type &mtype : material_data.get_all() ) {
+        material_type &mt = const_cast<material_type &>( mtype );
+        finalize_damage_map( mt._resistances.resist_vals );
+    }
 }
 
 void material_type::check() const
@@ -168,6 +168,17 @@ void material_type::check() const
     if( _wind_resist && ( *_wind_resist > 100 || *_wind_resist < 0 ) ) {
         debugmsg( "Wind resistance outside of range (100%% to 0%%, is %d%%) for %s.", *_wind_resist,
                   id.str() );
+    }
+
+    if( _repair_difficulty && ( _repair_difficulty > 10 || _repair_difficulty < 0 ) ) {
+        debugmsg( "Repair difficulty out of skill range (0 to 10, is %d) for %s.", _repair_difficulty,
+                  id.str() );
+    }
+
+    for( const auto &dt : _resistances.resist_vals ) {
+        if( !dt.first.is_valid() ) {
+            debugmsg( "Invalid resistance type \"%s\" for material %s", dt.first.c_str(), id.c_str() );
+        }
     }
 
     for( const damage_type &dt : damage_type::get_all() ) {
@@ -204,6 +215,12 @@ float material_type::resist( const damage_type_id &dmg_type ) const
     return _resistances.type_resist( dmg_type );
 }
 
+bool material_type::has_dedicated_resist( const damage_type_id &dmg_type ) const
+{
+    return std::find( _res_was_loaded.begin(), _res_was_loaded.end(),
+                      dmg_type ) != _res_was_loaded.end();
+}
+
 std::string material_type::bash_dmg_verb() const
 {
     return _bash_dmg_verb.translated();
@@ -214,18 +231,23 @@ std::string material_type::cut_dmg_verb() const
     return _cut_dmg_verb.translated();
 }
 
-std::string material_type::dmg_adj( int damage ) const
+std::string material_type::dmg_adj( int damage_level ) const
 {
-    if( damage <= 0 ) {
+    if( damage_level <= 1 ) {
         return std::string(); // not damaged
     }
-    // apply bounds checking
-    return _dmg_adj[std::min( static_cast<size_t>( damage ), _dmg_adj.size() ) - 1].translated();
+    const int idx = std::clamp( damage_level - 2, 0, static_cast<int>( _dmg_adj.size() ) );
+    return _dmg_adj[idx].translated();
 }
 
 int material_type::chip_resist() const
 {
     return _chip_resist;
+}
+
+int material_type::repair_difficulty() const
+{
+    return _repair_difficulty;
 }
 
 float material_type::specific_heat_liquid() const
@@ -303,11 +325,6 @@ int material_type::breathability() const
 std::optional<int> material_type::wind_resist() const
 {
     return _wind_resist;
-}
-
-bool material_type::edible() const
-{
-    return _edible;
 }
 
 bool material_type::rotting() const

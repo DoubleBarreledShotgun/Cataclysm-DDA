@@ -1,9 +1,9 @@
-#include <new>
 #include <optional>
+#include <string>
 
 #include "cata_catch.h"
 #include "text_snippets.h"
-#include "translations.h"
+#include "translation.h"
 
 TEST_CASE( "random_snippet_with_small_seed", "[text_snippets][rng]" )
 {
@@ -23,4 +23,10 @@ TEST_CASE( "random_snippet_with_small_seed", "[text_snippets][rng]" )
     // This is a very weak requirement, but should rule out the possibility of
     // using `std::minstd_rand0` with `std::uniform_int_distribution`.
     CHECK( snip_change >= ( seed_end - seed_start ) * 0.9 );
+}
+
+TEST_CASE( "text_snippet_escape", "[text_snippets]" )
+{
+    CHECK( SNIPPET.expand( "Foo <lt> bar <gt> baz" ) == "Foo < bar > baz" );
+    CHECK( SNIPPET.expand( "Foo <lt>lt<gt> baz" ) == "Foo <lt> baz" );
 }

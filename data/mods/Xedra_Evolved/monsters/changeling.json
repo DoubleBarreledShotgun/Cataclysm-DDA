@@ -24,7 +24,7 @@
     "weakpoint_sets": [ "wps_humanoid_body", "wps_humanoid_body_armor", "wps_humanoid_open_helmet" ],
     "families": [ "prof_wp_demihuman" ],
     "dodge": 2,
-    "harvest": "demihuman",
+    "harvest": "fae_changeling",
     "vision_day": 30,
     "vision_night": 3,
     "path_settings": { "max_dist": 30, "allow_open_doors": true, "avoid_traps": true, "avoid_sharp": true },
@@ -48,14 +48,35 @@
     "zombify_into": "mon_draugr",
     "fungalize_into": "mon_cracked_mirror",
     "anger_triggers": [ "FRIEND_DIED", "FRIEND_ATTACKED", "HURT" ],
-    "flags": [ "SEES", "HEARS", "WARM", "BASHES", "GROUP_BASH", "HUMAN", "CAN_OPEN_DOORS", "PATH_AVOID_DANGER_1", "DROPS_AMMO" ],
-    "armor": { "bash": 6, "cut": 6, "stab": 6, "heat": 6, "bullet": 6, "electric": 2 }
+    "flags": [
+      "SEES",
+      "HEARS",
+      "WARM",
+      "BASHES",
+      "GROUP_BASH",
+      "HUMAN",
+      "FAE_CREATURE",
+      "CAN_OPEN_DOORS",
+      "PATH_AVOID_DANGER",
+      "DROPS_AMMO"
+    ],
+    "armor": {
+      "bash": 6,
+      "cut": 6,
+      "stab": 6,
+      "heat": 6,
+      "bullet": 6,
+      "electric": 2,
+      "xe_cold_iron_cut_damage": 0,
+      "xe_cold_iron_bash_damage": 0,
+      "xe_cold_iron_stab_damage": 0
+    }
   },
   {
     "id": "mon_changeling_bannerman",
     "type": "MONSTER",
     "name": { "str": "changeling bannerman", "str_pl": "changeling bannermen" },
-    "description": "A tall lithe humanoid of indeterminate gender, in silvery scale mail, with archaic weapons.  Their sea-green eyes promise violence.",
+    "description": "A tall lithe humanoid of indeterminate gender, clad in silvery scale mail and wielding archaic weapons.  Their sea-green eyes promise violence.",
     "copy-from": "mon_changeling",
     "symbol": "%",
     "hp": 80,
@@ -64,7 +85,18 @@
     "melee_dice_sides": 5,
     "melee_damage": [ { "damage_type": "cut", "amount": 8 } ],
     "death_drops": "changeling_bannerman_death_drops",
-    "armor": { "stab": 6, "heat": 6, "electric": 2, "bash": 8, "cut": 8, "bullet": 8, "pure": 8 }
+    "armor": {
+      "stab": 6,
+      "heat": 6,
+      "electric": 2,
+      "bash": 8,
+      "cut": 8,
+      "bullet": 8,
+      "pure": 8,
+      "xe_cold_iron_cut_damage": 0,
+      "xe_cold_iron_bash_damage": 0,
+      "xe_cold_iron_stab_damage": 0
+    }
   },
   {
     "id": "mon_redcap_aspirant",
@@ -83,7 +115,18 @@
     "melee_damage": [ { "damage_type": "cut", "amount": 12 } ],
     "special_attacks": [ { "id": "impale" } ],
     "death_drops": "changeling_redcap_aspirant_death_drops",
-    "armor": { "stab": 6, "heat": 6, "electric": 2, "bash": 12, "cut": 12, "bullet": 24, "pure": 16 }
+    "armor": {
+      "stab": 6,
+      "heat": 6,
+      "electric": 2,
+      "bash": 12,
+      "cut": 12,
+      "bullet": 24,
+      "pure": 16,
+      "xe_cold_iron_cut_damage": 0,
+      "xe_cold_iron_bash_damage": 0,
+      "xe_cold_iron_stab_damage": 0
+    }
   },
   {
     "id": "mon_pooka_aspirant",
@@ -102,7 +145,18 @@
     "melee_damage": [ { "damage_type": "cut", "amount": 12 } ],
     "special_attacks": [ [ "BIO_OP_TAKEDOWN", 20 ] ],
     "death_drops": "changeling_pooka_aspirant_death_drops",
-    "armor": { "stab": 6, "heat": 6, "electric": 2, "bash": 12, "cut": 12, "bullet": 24, "pure": 16 }
+    "armor": {
+      "stab": 6,
+      "heat": 6,
+      "electric": 2,
+      "bash": 12,
+      "cut": 12,
+      "bullet": 24,
+      "pure": 16,
+      "xe_cold_iron_cut_damage": 0,
+      "xe_cold_iron_bash_damage": 0,
+      "xe_cold_iron_stab_damage": 0
+    }
   },
   {
     "id": "mon_march_lord",
@@ -111,7 +165,7 @@
     "description": "Nearly seven feet tall and whip thin, this warlord of the border realm of the Nether is clothed in silks and silvery tightly woven chainmail.  It glares at you and an ethereal sword manifests in its hand.",
     "default_faction": "changeling",
     "bodytype": "human",
-    "species": [ "CHANGELING" ],
+    "species": [ "CHANGELING", "CHANGELING_NOBLE" ],
     "volume": "72500 ml",
     "weight": "91500 g",
     "hp": 190,
@@ -127,16 +181,177 @@
     "melee_damage": [ { "damage_type": "cut", "amount": 12 } ],
     "weakpoint_sets": [ "wps_humanoid_body", "wps_humanoid_body_armor", "wps_humanoid_open_helmet" ],
     "dodge": 5,
-    "harvest": "demihuman",
+    "harvest": "fae_march_lord",
     "families": [ "prof_wp_demihuman" ],
     "vision_day": 50,
     "vision_night": 6,
     "path_settings": { "max_dist": 30, "allow_open_doors": true, "avoid_traps": true, "avoid_sharp": true },
-    "special_attacks": [ { "type": "spell", "spell_data": { "id": "hoary_blast", "min_level": 5 }, "cooldown": 10 } ],
+    "special_attacks": [ { "type": "spell", "spell_data": { "id": "hoary_blast_march_lord", "min_level": 5 }, "cooldown": 15 } ],
     "death_drops": "changeling_lord_death_drops",
     "anger_triggers": [ "FRIEND_DIED", "FRIEND_ATTACKED", "HURT" ],
-    "flags": [ "SEES", "HEARS", "WARM", "BASHES", "GROUP_BASH", "HUMAN", "CAN_OPEN_DOORS", "PATH_AVOID_DANGER_1", "DROPS_AMMO" ],
-    "armor": { "bash": 22, "cut": 36, "stab": 16, "heat": 90, "bullet": 36, "electric": 2, "pure": 160 }
+    "flags": [
+      "SEES",
+      "HEARS",
+      "WARM",
+      "BASHES",
+      "GROUP_BASH",
+      "HUMAN",
+      "FAE_CREATURE",
+      "CAN_OPEN_DOORS",
+      "PATH_AVOID_DANGER",
+      "DROPS_AMMO",
+      "MAGIC_USER"
+    ],
+    "armor": {
+      "bash": 22,
+      "cut": 36,
+      "stab": 16,
+      "heat": 90,
+      "bullet": 36,
+      "electric": 2,
+      "pure": 160,
+      "xe_cold_iron_cut_damage": 0,
+      "xe_cold_iron_bash_damage": 0,
+      "xe_cold_iron_stab_damage": 0
+    }
+  },
+  {
+    "id": "mon_wild_huntsman",
+    "type": "MONSTER",
+    "name": { "str": "Wild Huntsman", "str_pl": "Wild Huntsmen" },
+    "description": "Shrouded in an obscuring cloak, this fae warrior is crowned with an impressive rack of antlers spreading through rents in its gossamer hood.  Two burning blue eyes are all that is visible of its features.  In one mailed hand, it holds a sword made of wood as black as ebony.",
+    "default_faction": "changeling",
+    "bodytype": "human",
+    "species": [ "CHANGELING", "CHANGELING_NOBLE" ],
+    "volume": "72500 ml",
+    "weight": "91500 g",
+    "hp": 250,
+    "speed": 130,
+    "material": [ "fae_flesh" ],
+    "symbol": "&",
+    "color": "green",
+    "aggression": 50,
+    "morale": 120,
+    "melee_skill": 7,
+    "melee_dice": 1,
+    "melee_dice_sides": 6,
+    "weakpoint_sets": [ "wps_humanoid_body", "wps_humanoid_body_armor", "wps_humanoid_open_helmet" ],
+    "dodge": 5,
+    "harvest": "fae_march_lord",
+    "families": [ "prof_wp_demihuman" ],
+    "vision_day": 50,
+    "vision_night": 10,
+    "path_settings": { "max_dist": 30, "allow_open_doors": true, "avoid_traps": true, "avoid_sharp": true },
+    "special_attacks": [
+      {
+        "type": "monster_attack",
+        "attack_type": "melee",
+        "id": "wild_huntsman_sword",
+        "cooldown": 1,
+        "move_cost": 80,
+        "damage_max_instance": [ { "damage_type": "cut", "amount": 25, "armor_penetration": 5 }, { "damage_type": "biological", "amount": 5 } ],
+        "effects": [ { "id": "effect_reduced_healing", "chance": 25, "duration": [ 3600, 10800 ] } ],
+        "condition": { "test_eoc": "is_disarmed" },
+        "hit_dmg_u": "%1$s slashes your %2$s with its sword!",
+        "hit_dmg_npc": "%1$s slashes <npcname>'s %2$s with its sword!",
+        "miss_msg_u": "%1$s tries to hit you, but you dodge!",
+        "miss_msg_npc": "%1$s tries to hit <npcname>, but they dodge!",
+        "no_dmg_msg_u": "%1$s slashes your %2$s without penetrating your armor.",
+        "no_dmg_msg_npc": "%1$s slashes <npcname>'s %2$s without penetrating their armor."
+      },
+      {
+        "id": "wild_huntsman_illumination_spell",
+        "type": "spell",
+        "spell_data": { "id": "wild_hunt_illumination_spell" },
+        "cooldown": 45,
+        "condition": { "not": { "npc_has_effect": "wild_hunt_illumination_spell" } },
+        "monster_message": "%1$s makes a gestures with one hand and a glow springs up around you!"
+      }
+    ],
+    "death_drops": "changeling_wild_hunt_death_drops",
+    "anger_triggers": [ "FRIEND_DIED", "FRIEND_ATTACKED", "HURT" ],
+    "flags": [
+      "SEES",
+      "HEARS",
+      "WARM",
+      "BASHES",
+      "GROUP_BASH",
+      "HUMAN",
+      "FAE_CREATURE",
+      "CAN_OPEN_DOORS",
+      "PATH_AVOID_DANGER",
+      "MAGIC_USER"
+    ],
+    "armor": {
+      "bash": 22,
+      "cut": 36,
+      "stab": 16,
+      "cold": 5000,
+      "bullet": 36,
+      "electric": 2,
+      "pure": 160,
+      "xe_cold_iron_cut_damage": 0,
+      "xe_cold_iron_bash_damage": 0,
+      "xe_cold_iron_stab_damage": 0
+    }
+  },
+  {
+    "id": "mon_wild_hunt_hound",
+    "type": "MONSTER",
+    "name": { "str": "hound of the wild hunt" },
+    "description": "An enormous dog, a meter and a half high at the shoulder, with silvery fur and multicolored eyes.  It sniffs the air and looks around alertly.",
+    "default_faction": "changeling",
+    "bodytype": "dog",
+    "species": [ "CHANGELING" ],
+    "volume": "200000 ml",
+    "weight": "200000 g",
+    "hp": 175,
+    "speed": 140,
+    "material": [ "fae_flesh" ],
+    "symbol": "D",
+    "color": "light_gray",
+    "looks_like": "mon_direwolf",
+    "scents_tracked": [ "sc_human", "sc_fetid", "sc_fae", "sc_vampire" ],
+    "aggression": 30,
+    "morale": 70,
+    "melee_skill": 7,
+    "melee_dice": 2,
+    "melee_dice_sides": 10,
+    "melee_damage": [ { "damage_type": "cut", "amount": 6 } ],
+    "dodge": 2,
+    "bleed_rate": 60,
+    "vision_day": 50,
+    "vision_night": 20,
+    "grab_strength": 40,
+    "harvest": "fae_furred",
+    "families": [ "prof_gross_anatomy", "prof_intro_biology", "prof_physiology" ],
+    "path_settings": { "max_dist": 10 },
+    "special_attacks": [
+      {
+        "type": "bite",
+        "cooldown": 5,
+        "damage_max_instance": [ { "damage_type": "stab", "amount": 15, "armor_penetration": 10 } ]
+      },
+      { "id": "bite_grab", "cooldown": 10 },
+      {
+        "id": "wild_hunt_hound_baying",
+        "type": "spell",
+        "spell_data": { "id": "wild_hunt_hound_baying" },
+        "cooldown": 60,
+        "condition": { "not": { "npc_has_effect": "wild_hunt_illumination_spell" } },
+        "monster_message": "%1$s lets out a deep baying!"
+      }
+    ],
+    "anger_triggers": [ "STALK", "FRIEND_ATTACKED", "FRIEND_DIED", "PLAYER_WEAK" ],
+    "flags": [ "SEES", "HEARS", "SMELLS", "ANIMAL", "PATH_AVOID_DANGER", "WARM", "KEENNOSE", "EATS" ],
+    "armor": {
+      "bash": 8,
+      "cut": 10,
+      "electric": 1,
+      "xe_cold_iron_cut_damage": 0,
+      "xe_cold_iron_bash_damage": 0,
+      "xe_cold_iron_stab_damage": 0
+    }
   },
   {
     "id": "mon_draugr",
@@ -162,11 +377,34 @@
     "weakpoint_sets": [ "wps_humanoid_body", "wps_humanoid_body_armor", "wps_humanoid_open_helmet" ],
     "vision_day": 30,
     "vision_night": 3,
-    "harvest": "zombie",
-    "special_attacks": [ [ "GRAB", 7 ], [ "scratch", 20 ] ],
+    "harvest": "zombie_humanoid",
+    "grab_strength": 20,
+    "special_attacks": [ { "id": "grab", "cooldown": 7 }, { "id": "scratch_humanoid" } ],
     "death_drops": "changeling_death_drops",
-    "flags": [ "SEES", "HEARS", "STUMBLES", "WARM", "BASHES", "GROUP_BASH", "POISON", "NO_BREATHE", "REVIVES", "PUSH_MON", "FILTHY" ],
-    "armor": { "bash": 6, "cut": 6, "stab": 9, "bullet": 6, "electric": 2 }
+    "flags": [
+      "SEES",
+      "HEARS",
+      "STUMBLES",
+      "WARM",
+      "GRABS",
+      "BASHES",
+      "GROUP_BASH",
+      "POISON",
+      "NO_BREATHE",
+      "REVIVES",
+      "PUSH_MON",
+      "FILTHY"
+    ],
+    "armor": {
+      "bash": 6,
+      "cut": 6,
+      "stab": 9,
+      "bullet": 6,
+      "electric": 2,
+      "xe_cold_iron_cut_damage": 0,
+      "xe_cold_iron_bash_damage": 0,
+      "xe_cold_iron_stab_damage": 0
+    }
   },
   {
     "id": "mon_cracked_mirror",
@@ -192,11 +430,21 @@
     "bleed_rate": 0,
     "vision_day": 5,
     "vision_night": 5,
-    "harvest": "zombie",
-    "special_attacks": [ [ "FUNGUS", 200 ], { "type": "bite", "cooldown": 5 } ],
+    "harvest": "zombie_humanoid",
+    "grab_strength": 20,
+    "special_attacks": [ [ "FUNGUS", 200 ], { "id": "bite_humanoid", "cooldown": 5 }, { "id": "grab" } ],
     "death_drops": "changeling_death_drops",
     "flags": [ "SEES", "SMELLS", "STUMBLES", "WARM", "BASHES", "GROUP_BASH", "POISON", "NO_BREATHE", "PUSH_MON", "FILTHY" ],
-    "armor": { "bash": 2, "cut": 9, "stab": 16, "bullet": 12, "electric": 20 }
+    "armor": {
+      "bash": 2,
+      "cut": 9,
+      "stab": 16,
+      "bullet": 12,
+      "electric": 20,
+      "xe_cold_iron_cut_damage": 0,
+      "xe_cold_iron_bash_damage": 0,
+      "xe_cold_iron_stab_damage": 0
+    }
   },
   {
     "id": "mon_fetch_child",
@@ -223,18 +471,18 @@
     "weakpoint_sets": [ "wps_humanoid_body", "wps_humanoid_child_body", "wps_humanoid_head_big" ],
     "vision_day": 30,
     "vision_night": 3,
-    "harvest": "demihuman",
+    "harvest": "fetch",
     "special_attacks": [ { "type": "melee", "id": "sharp_objects", "attack_upper": false, "cooldown": 15 }, [ "PARROT_AT_DANGER", 800 ] ],
     "death_drops": { "subtype": "collection", "groups": [ [ "default_zombie_children_clothes", 100 ], [ "child_items", 65 ] ] },
     "death_function": { "effect": { "id": "death_guilt", "min_level": 9 } },
-    "flags": [ "SEES", "HEARS", "WARM", "BASHES" ],
+    "flags": [ "SEES", "HEARS", "FAE_CREATURE", "WARM", "BASHES", "GUILT_CHILD" ],
     "armor": { "bullet": 4, "electric": 1 }
   },
   {
     "id": "mon_fetch_daffodil_warrior",
     "type": "MONSTER",
     "name": { "str": "daffodil warrior" },
-    "description": "Wispy and willowy these fetches are the cannon fodder of the Fae.  Said to grow in vast fields under the hill and harvested right before a battle legends says they live but a day.  Its features are quite plant-like and one arm ends in an ornate club.",
+    "description": "Wispy and willowy these fetches are the cannon fodder of the Fae.  Said to grow in vast fields under the hill and harvested right before a battle legends say they live but a day.  Its features are quite plant-like and one arm ends in an ornate club.",
     "default_faction": "changeling",
     "bodytype": "human",
     "species": [ "CHANGELING" ],
@@ -255,8 +503,8 @@
     "vision_day": 30,
     "vision_night": 3,
     "death_function": { "corpse_type": "NO_CORPSE", "message": "The %s bursts into a rain of pollen!" },
-    "flags": [ "SEES", "HEARS", "WARM", "BASHES" ],
-    "armor": { "cut": 4, "bullet": 4 }
+    "flags": [ "SEES", "HEARS", "FAE_CREATURE", "WARM", "BASHES" ],
+    "armor": { "cut": 4, "bullet": 4, "xe_cold_iron_cut_damage": 0, "xe_cold_iron_bash_damage": 0, "xe_cold_iron_stab_damage": 0 }
   },
   {
     "id": "mon_fae_wolf",
@@ -288,14 +536,14 @@
     "harvest": "fae_furred",
     "path_settings": { "max_dist": 10 },
     "special_attacks": [ { "type": "bite", "cooldown": 6 } ],
-    "flags": [ "SEES", "SMELLS", "HEARS", "WARM", "BASHES", "HIT_AND_RUN" ],
-    "armor": { "cut": 5, "bullet": 15 }
+    "flags": [ "SEES", "SMELLS", "HEARS", "FAE_CREATURE", "WARM", "BASHES", "HIT_AND_RUN" ],
+    "armor": { "cut": 5, "bullet": 15, "xe_cold_iron_cut_damage": 0, "xe_cold_iron_bash_damage": 0, "xe_cold_iron_stab_damage": 0 }
   },
   {
     "id": "mon_goblin_spider",
     "type": "MONSTER",
     "name": { "str": "goblin spider" },
-    "description": "A giant, dark gray goblin spider, the size of a pony and above the mandibles where you would expect to see the eyes instead there is a child's face.  It seems to vanish into the shadows if you take your eyes off it.",
+    "description": "A giant, dark gray goblin spider, the size of a pony.  Above the mandibles, where you would expect to see the eyes, instead there is a child's face.  It seems to vanish into the shadows if you take your eyes off it.",
     "default_faction": "changeling",
     "bodytype": "spider",
     "species": [ "CHANGELING" ],
@@ -319,17 +567,34 @@
     "dodge": 2,
     "vision_day": 5,
     "vision_night": 5,
-    "harvest": "demihuman",
+    "harvest": "fae_changeling",
     "weakpoint_sets": [ "wps_humanoid_head_small", "wps_arthropod_spider" ],
-    "families": [ "prof_wp_demihuman" ],
-    "flags": [ "SEES", "SMELLS", "HEARS", "WEBWALK", "CLIMBS", "PATH_AVOID_FIRE", "PATH_AVOID_FALL", "NIGHT_INVISIBILITY" ],
-    "armor": { "bash": 2, "cut": 6, "bullet": 8 }
+    "families": [ "prof_wp_demihuman", "prof_wp_spider" ],
+    "flags": [
+      "SEES",
+      "SMELLS",
+      "HEARS",
+      "FAE_CREATURE",
+      "WEBWALK",
+      "CLIMBS",
+      "PATH_AVOID_FIRE",
+      "PATH_AVOID_FALL",
+      "NIGHT_INVISIBILITY"
+    ],
+    "armor": {
+      "bash": 2,
+      "cut": 6,
+      "bullet": 8,
+      "xe_cold_iron_cut_damage": 0,
+      "xe_cold_iron_bash_damage": 0,
+      "xe_cold_iron_stab_damage": 0
+    }
   },
   {
     "id": "mon_xe_unicorn",
     "type": "MONSTER",
     "name": { "str": "unicorn" },
-    "description": "A hooved grazing creature with a thick, shaggy, shimmering mane of hair, a sweeping tail, and powerful-looking muscles.  Impossible to confuse with a regular horse even if you don't spot the spiraled horn coming from the head.  Rumor has it that some of the Fair Lords have ways to tame and ride this magnificent creature.",
+    "description": "A hooved grazing creature with a thick, shaggy, shimmering mane of hair, a sweeping tail, and powerful-looking muscles.  Impossible to confuse with a regular horse even if you don't spot the spiraled horn coming from its head.  Rumor has it that some of the Fair Lords have ways to tame and ride this magnificent creature.",
     "default_faction": "changeling",
     "bodytype": "horse",
     "species": [ "CHANGELING" ],
@@ -342,7 +607,9 @@
     "symbol": "U",
     "color": "white",
     "scents_ignored": [ "sc_fae" ],
+    "aggression": 10,
     "morale": 80,
+    "aggro_character": false,
     "melee_skill": 6,
     "melee_dice": 3,
     "melee_dice_sides": 12,
@@ -352,7 +619,8 @@
     "fear_triggers": [ "SOUND", "PLAYER_CLOSE" ],
     "placate_triggers": [ "PLAYER_WEAK" ],
     "harvest": "fae_furred",
-    "reproduction": { "baby_monster": "mon_xe_unicorn_foal", "baby_count": 1, "baby_timer": 360 },
+    "families": [ "prof_gross_anatomy", "prof_intro_biology", "prof_physiology" ],
+    "reproduction": { "baby_type": { "baby_monster": "mon_xe_unicorn_foal" }, "baby_count": 1, "baby_timer": 360 },
     "baby_flags": [ "SPRING", "SUMMER", "AUTUMN" ],
     "biosignature": { "biosig_item": "feces_manure", "biosig_timer": 2 },
     "special_attacks": [ [ "EAT_CROP", 60 ] ],
@@ -362,13 +630,25 @@
       "HEARS",
       "SMELLS",
       "ANIMAL",
+      "FAE_CREATURE",
       "PET_WONT_FOLLOW",
       "PET_MOUNTABLE",
-      "PATH_AVOID_DANGER_1",
+      "PATH_AVOID_DANGER",
       "WARM",
-      "HIT_AND_RUN"
+      "HIT_AND_RUN",
+      "STABILIZED_TIMELINE"
     ],
-    "armor": { "bash": 8, "cut": 6, "bullet": 18, "electric": 9, "cold": 20, "pure": 10 }
+    "armor": {
+      "bash": 8,
+      "cut": 6,
+      "bullet": 18,
+      "electric": 9,
+      "cold": 20,
+      "pure": 10,
+      "xe_cold_iron_cut_damage": 0,
+      "xe_cold_iron_bash_damage": 0,
+      "xe_cold_iron_stab_damage": 0
+    }
   },
   {
     "id": "mon_xe_unicorn_foal",
@@ -390,6 +670,7 @@
     "color": "white",
     "scents_ignored": [ "sc_fae" ],
     "aggression": -10,
+    "aggro_character": false,
     "morale": 10,
     "melee_skill": 3,
     "melee_dice": 2,
@@ -403,14 +684,14 @@
     "biosignature": { "biosig_item": "feces_manure", "biosig_timer": 10 },
     "special_attacks": [ [ "EAT_CROP", 100 ] ],
     "petfood": { "food": [ "UNICORNFOOD" ], "feed": "The %s seems to like you!  It lets you pat its head and seems friendly." },
-    "flags": [ "SEES", "HEARS", "SMELLS", "ANIMAL", "PET_WONT_FOLLOW", "PATH_AVOID_DANGER_1", "WARM", "NO_BREED" ],
-    "armor": { "bash": 2, "electric": 1 }
+    "flags": [ "SEES", "HEARS", "SMELLS", "ANIMAL", "FAE_CREATURE", "PET_WONT_FOLLOW", "PATH_AVOID_DANGER", "WARM", "NO_BREED" ],
+    "armor": { "bash": 2, "electric": 1, "xe_cold_iron_cut_damage": 0, "xe_cold_iron_bash_damage": 0, "xe_cold_iron_stab_damage": 0 }
   },
   {
     "id": "mon_xe_mavka",
     "type": "MONSTER",
     "name": { "str": "mavka" },
-    "description": "A beautiful woman clad in diaphanous robes, that drift in the water along with her lengthy hair.  As she steps up and across the water you never manage to see her reflection.  Suddenly, the hair moves and grabs some small animal and pulls it towards the creature.",
+    "description": "A beautiful woman clad in diaphanous robes that drifts in the water along with her lengthy hair.  As she steps up and across the water you never manage to see her reflection.  Suddenly, her hair moves and grabs some small animal and pulls it towards herself.",
     "default_faction": "changeling",
     "bodytype": "human",
     "species": [ "CHANGELING" ],
@@ -428,15 +709,14 @@
     "melee_dice": 2,
     "melee_dice_sides": 6,
     "melee_damage": [ { "damage_type": "cut", "amount": 2 } ],
-    "grab_strength": 5,
+    "grab_strength": 100,
     "dodge": 5,
-    "luminance": 0,
-    "harvest": "demihuman",
+    "harvest": "fae_changeling",
     "weakpoint_sets": [ "wps_humanoid_body" ],
     "families": [ "prof_wp_demihuman" ],
-    "special_attacks": [ [ "RANGED_PULL", 10 ], [ "GRAB_DRAG", 3 ] ],
+    "special_attacks": [ { "id": "ranged_pull", "cooldown": 10 }, { "id": "grab_drag" }, { "id": "drag_followup" } ],
     "path_settings": { "max_dist": 50, "allow_open_doors": true, "avoid_traps": true, "avoid_sharp": true },
-    "flags": [ "SEES", "HEARS", "SMELLS", "SWIMS", "AQUATIC", "GRABS" ]
+    "flags": [ "SEES", "HEARS", "HAS_MIND", "FAE_CREATURE", "GRABS", "SMELLS", "SWIMS", "AQUATIC", "GRABS" ]
   },
   {
     "id": "mon_melian_mantis_mount",
@@ -469,7 +749,8 @@
     "anger_triggers": [ "FRIEND_ATTACKED" ],
     "fear_triggers": [ "FIRE", "HURT" ],
     "special_attacks": [
-      [ "GRAB_DRAG", 10 ],
+      { "id": "grab_drag" },
+      { "id": "drag_followup" },
       {
         "type": "leap",
         "cooldown": 8,
@@ -482,6 +763,7 @@
       "SEES",
       "HEARS",
       "CLIMBS",
+      "FAE_CREATURE",
       "PATH_AVOID_FIRE",
       "PET_WONT_FOLLOW",
       "PET_MOUNTABLE",
@@ -489,6 +771,57 @@
       "COMBAT_MOUNT",
       "INSECTICIDEPROOF"
     ],
-    "armor": { "bash": 10, "cut": 16, "bullet": 13, "electric": 2 }
+    "armor": {
+      "bash": 10,
+      "cut": 16,
+      "bullet": 13,
+      "electric": 2,
+      "xe_cold_iron_cut_damage": 0,
+      "xe_cold_iron_bash_damage": 0,
+      "xe_cold_iron_stab_damage": 0
+    }
+  },
+  {
+    "id": "mon_changeling_wisp",
+    "type": "MONSTER",
+    "name": "will-o'-the-wisp",
+    "description": "Drifting lights in the distance, moving slowly, seeming to light the way.  But to what?",
+    "default_faction": "changeling",
+    "bodytype": "blob",
+    "species": [ "CHANGELING" ],
+    "volume": "1500 ml",
+    "weight": "136 g",
+    "hp": 20,
+    "speed": 125,
+    "luminance": 16,
+    "material": [ "powder" ],
+    "symbol": "o",
+    "color": "yellow",
+    "aggression": -10,
+    "morale": 40,
+    "melee_skill": 1,
+    "melee_dice": 1,
+    "melee_dice_sides": 4,
+    "dodge": 9,
+    "vision_day": 30,
+    "vision_night": 30,
+    "harvest": "exempt",
+    "fear_triggers": [ "HURT", "FRIEND_ATTACKED", "PLAYER_CLOSE", "SOUND" ],
+    "path_settings": { "max_dist": 30, "avoid_traps": false, "avoid_sharp": false },
+    "death_function": { "message": "The %s disintegrates!", "corpse_type": "NO_CORPSE" },
+    "flags": [
+      "SEES",
+      "HEARS",
+      "FLIES",
+      "PATH_AVOID_DANGER",
+      "PATH_AVOID_FIRE",
+      "ELECTRIC",
+      "HARDTOSHOOT",
+      "PACIFIST",
+      "NOGIB",
+      "NOHEAD",
+      "NO_BREATHE",
+      "SWARMS"
+    ]
   }
 ]

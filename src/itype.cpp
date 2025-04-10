@@ -1,24 +1,36 @@
 #include "itype.h"
 
-#include <cstdlib>
+#include <algorithm>
+#include <cmath>
+#include <iterator>
 #include <utility>
 
 #include "ammo.h"
 #include "cata_utility.h"
 #include "character.h"
 #include "debug.h"
+#include "generic_factory.h"
 #include "item.h"
 #include "make_static.h"
+#include "map.h"
+#include "material.h"
 #include "recipe.h"
+#include "requirements.h"
 #include "ret_val.h"
+#include "subbodypart.h"
 #include "translations.h"
-
-struct tripoint;
 
 std::string gunmod_location::name() const
 {
     // Yes, currently the name is just the translated id.
     return _( _id );
+}
+
+void gun_modifier_data::deserialize( const JsonObject &jo )
+{
+    mandatory( jo, false, "name", name_ );
+    mandatory( jo, false, "amount", qty_ );
+    optional( jo, false, "flags", flags_ );
 }
 
 std::string islot_book::recipe_with_description_t::name() const
@@ -38,6 +50,8 @@ std::string enum_to_string<condition_type>( condition_type data )
     switch( data ) {
         case condition_type::FLAG:
             return "FLAG";
+        case condition_type::VITAMIN:
+            return "VITAMIN";
         case condition_type::COMPONENT_ID:
             return "COMPONENT_ID";
         case condition_type::COMPONENT_ID_SUBSTRING:
@@ -60,6 +74,8 @@ std::string enum_to_string<itype_variant_kind>( itype_variant_kind data )
             return "gun";
         case itype_variant_kind::generic:
             return "generic";
+        case itype_variant_kind::drug:
+            return "drug";
         case itype_variant_kind::last:
             debugmsg( "Invalid variant type!" );
             return "";
@@ -178,36 +194,41 @@ const use_function *itype::get_use( const std::string &iuse_name ) const
     return iter != use_methods.end() ? &iter->second : nullptr;
 }
 
-int itype::tick( Character &p, item &it, const tripoint &pos ) const
+int itype::tick( Character *p, item &it, const tripoint_bub_ms &pos ) const
 {
-    // Note: can go higher than current charge count
-    // Maybe should move charge decrementing here?
     int charges_to_use = 0;
-    for( const auto &method : use_methods ) {
-        const int val = method.second.call( p, it, true, pos ).value_or( 0 );
-        if( charges_to_use < 0 || val < 0 ) {
-            charges_to_use = -1;
-        } else {
-            charges_to_use += val;
-        }
+    for( const auto &method : tick_action ) {
+        charges_to_use += method.second.call( p, it, pos ).value_or( 0 );
     }
 
     return charges_to_use;
 }
 
-std::optional<int> itype::invoke( Character &p, item &it, const tripoint &pos ) const
+std::optional<int> itype::invoke( Character *p, item &it, const tripoint_bub_ms &pos ) const
+{
+    return itype::invoke( p, it, &get_map(), pos );
+}
+
+std::optional<int> itype::invoke( Character *p, item &it, map *here,
+                                  const tripoint_bub_ms &pos ) const
 {
     if( !has_use() ) {
         return 0;
     }
     if( use_methods.find( "transform" ) != use_methods.end() ) {
-        return  invoke( p, it, pos, "transform" );
+        return invoke( p, it, here, pos, "transform" );
     } else {
-        return invoke( p, it, pos, use_methods.begin()->first );
+        return invoke( p, it, here, pos, use_methods.begin()->first );
     }
 }
 
-std::optional<int> itype::invoke( Character &p, item &it, const tripoint &pos,
+std::optional<int> itype::invoke( Character *p, item &it, const tripoint_bub_ms &pos,
+                                  const std::string &iuse_name ) const
+{
+    return itype::invoke( p, it, &get_map(), pos, iuse_name );
+}
+
+std::optional<int> itype::invoke( Character *p, item &it, map *here, const tripoint_bub_ms &pos,
                                   const std::string &iuse_name ) const
 {
     const use_function *use = get_use( iuse_name );
@@ -216,16 +237,16 @@ std::optional<int> itype::invoke( Character &p, item &it, const tripoint &pos,
                   iuse_name, nname( 1 ) );
         return 0;
     }
+    if( p ) {
+        const auto ret = use->can_call( *p, it, here, pos );
 
-    p.invalidate_weight_carried_cache();
-    const auto ret = use->can_call( p, it, false, pos );
-
-    if( !ret.success() ) {
-        p.add_msg_if_player( m_info, ret.str() );
-        return 0;
+        if( !ret.success() ) {
+            p->add_msg_if_player( m_info, ret.str() );
+            return 0;
+        }
     }
 
-    return use->call( p, it, false, pos );
+    return use->call( p, it, here, pos );
 }
 
 std::string gun_type_type::name() const
@@ -424,4 +445,64 @@ const itype_id &itype::tool_slot_first_ammo() const
         }
     }
     return itype_id::NULL_ID();
+}
+
+int islot_ammo::dispersion_considering_length( units::length barrel_length ) const
+{
+
+    if( disp_mod_by_barrels.empty() ) {
+        return  dispersion;
+    }
+    std::vector<std::pair<float, float>> lerp_points;
+    lerp_points.reserve( disp_mod_by_barrels.size() );
+    for( const disp_mod_by_barrel &b : disp_mod_by_barrels ) {
+        lerp_points.emplace_back( static_cast<float>( b.barrel_length.value() ),
+                                  static_cast<float>( b.dispersion_modifier ) );
+    }
+    return multi_lerp( lerp_points, barrel_length.value() ) + dispersion;
+}
+
+bool item_melee_damage::handle_proportional( const JsonValue &jval )
+{
+    if( jval.test_object() ) {
+        item_melee_damage rhs;
+        rhs.default_value = 1.0f;
+        rhs.deserialize( jval.get_object() );
+        for( const std::pair<const damage_type_id, float> &dt : rhs.damage_map ) {
+            const auto iter = damage_map.find( dt.first );
+            if( iter != rhs.damage_map.end() ) {
+                iter->second *= dt.second;
+                // For maintaining legacy behaviour (when melee damage used ints)
+                iter->second = std::floor( iter->second );
+            }
+        }
+        return true;
+    }
+    jval.throw_error( "invalid damage map for item melee damage" );
+    return false;
+}
+
+item_melee_damage &item_melee_damage::operator+=( const item_melee_damage &rhs )
+{
+    for( const std::pair<const damage_type_id, float> &dt : rhs.damage_map ) {
+        const auto iter = damage_map.find( dt.first );
+        if( iter != rhs.damage_map.end() ) {
+            iter->second += dt.second;
+            // For maintaining legacy behaviour (when melee damage used ints)
+            iter->second = std::floor( iter->second );
+        }
+    }
+    return *this;
+}
+
+void item_melee_damage::finalize()
+{
+    finalize_damage_map( damage_map, false, default_value );
+}
+
+void item_melee_damage::deserialize( const JsonObject &jo )
+{
+    damage_map = load_damage_map( jo );
+    //we can do this because items are always loaded after damage types
+    finalize();
 }

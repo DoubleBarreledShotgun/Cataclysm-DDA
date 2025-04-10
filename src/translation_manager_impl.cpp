@@ -21,6 +21,9 @@ std::uint32_t TranslationManager::Impl::Hash( const char *str )
 std::optional<std::pair<std::size_t, std::size_t>> TranslationManager::Impl::LookupString(
             const char *query ) const
 {
+    if( strings.empty() ) {
+        return std::nullopt;
+    }
     std::uint32_t hash = Hash( query );
     auto it = strings.find( hash );
     if( it == strings.end() ) {
@@ -51,23 +54,25 @@ std::string TranslationManager::Impl::LanguageCodeOfPath( const std::string_view
 
 void TranslationManager::Impl::ScanTranslationDocuments()
 {
-    DebugLog( D_INFO, DC_ALL ) << "[i18n] Scanning core translations from " << locale_dir();
-    DebugLog( D_INFO, DC_ALL ) << "[i18n] Scanning mod translations from " << PATH_INFO::user_moddir();
     std::vector<std::pair<std::string, std::string>> mo_dirs;
-    for( const auto &dir : get_files_from_path( "LC_MESSAGES",
-            PATH_INFO::user_moddir(),
-            true ) ) {
-        mo_dirs.emplace_back( dir, ".mo" );
+    if( dir_exist( PATH_INFO::user_moddir() ) ) {
+        DebugLog( D_INFO, DC_ALL ) << "[i18n] Scanning mod translations from " << PATH_INFO::user_moddir();
+        for( const std::string & dir
+             : get_files_from_path( "LC_MESSAGES", PATH_INFO::user_moddir(), true ) ) {
+            mo_dirs.emplace_back( dir, ".mo" );
+        }
     }
-    for( const auto &dir : get_files_from_path( "LC_MESSAGES", locale_dir(),
-            true ) ) {
-        mo_dirs.emplace_back( dir, "cataclysm-dda.mo" );
+    if( dir_exist( locale_dir() ) ) {
+        DebugLog( D_INFO, DC_ALL ) << "[i18n] Scanning core translations from " << locale_dir();
+        for( const std::string &dir : get_files_from_path( "LC_MESSAGES", locale_dir(), true ) ) {
+            mo_dirs.emplace_back( dir, "cataclysm-dda.mo" );
+        }
     }
-    for( const auto &entry : mo_dirs ) {
-        const auto &dir = entry.first;
-        const auto &pattern = entry.second;
+    for( const std::pair<std::string, std::string> &entry : mo_dirs ) {
+        const std::string &dir = entry.first;
+        const std::string &pattern = entry.second;
         std::vector<std::string> mo_dir_files = get_files_from_path( pattern, dir, false, true );
-        for( const auto &file : mo_dir_files ) {
+        for( const std::string &file : mo_dir_files ) {
             const std::string lang = LanguageCodeOfPath( file );
             if( mo_files.count( lang ) == 0 ) {
                 mo_files[lang] = std::vector<std::string>();

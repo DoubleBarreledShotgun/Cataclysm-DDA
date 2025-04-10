@@ -1,25 +1,15 @@
 #include "active_item_cache.h"
 
 #include <algorithm>
+#include <numeric>
+#include <string>
 #include <utility>
 
 #include "item.h"
+#include "item_pocket.h"
 #include "safe_reference.h"
 
-namespace
-{
-
-void _remove_if( std::list<item_reference> &active_items, item const *it )
-{
-    active_items.remove_if( [it]( const item_reference & active_item ) {
-        item *const target = active_item.item_ref.get();
-        return !target || target == it;
-    } );
-}
-
-} // namespace
-
-float item_reference::spoil_multiplier()
+float item_reference::spoil_multiplier() const
 {
     return std::accumulate(
                pocket_chain.begin(), pocket_chain.end(), 1.0F,
@@ -28,28 +18,22 @@ float item_reference::spoil_multiplier()
     } );
 }
 
-void active_item_cache::remove( const item *it )
+bool item_reference::has_watertight_container() const
 {
-    for( item const *iter : it->all_items_ptr() ) {
-        _remove_if( active_items[iter->processing_speed()], iter );
-    }
-    _remove_if( active_items[it->processing_speed()], it );
-    if( it->can_revive() ) {
-        special_items[ special_item_type::corpse ].remove_if( [it]( const item_reference & active_item ) {
-            item *const target = active_item.item_ref.get();
-            return !target || target == it;
-        } );
-    }
-    if( it->get_use( "explosion" ) ) {
-        special_items[ special_item_type::explosive ].remove_if( [it]( const item_reference &
-        active_item ) {
-            item *const target = active_item.item_ref.get();
-            return !target || target == it;
-        } );
-    }
+    return std::any_of(
+               pocket_chain.begin(), pocket_chain.end(),
+    []( item_pocket const * pk ) {
+        return pk->can_contain_liquid( false );
+    } );
 }
 
-bool active_item_cache::add( item &it, point location, item *parent,
+bool active_item_cache::add( item &it, point_sm_ms location, item *parent,
+                             std::vector<item_pocket const *> const &pocket_chain )
+{
+    return active_item_cache::add( it, rebase_rel( location ), parent, pocket_chain );
+}
+
+bool active_item_cache::add( item &it, point_rel_ms location, item *parent,
                              std::vector<item_pocket const *> const &pocket_chain )
 {
     std::vector<item_pocket const *> pockets = pocket_chain;
@@ -60,16 +44,28 @@ bool active_item_cache::add( item &it, point location, item *parent,
             ret |= add( *pkit, location, &it, pockets );
         }
     }
-    if( it.processing_speed() == item::NO_PROCESSING ) {
+    int speed = it.processing_speed();
+    if( speed == item::NO_PROCESSING ) {
         return ret;
     }
-    std::list<item_reference> &target_list = active_items[it.processing_speed()];
+    std::unordered_map<item *, safe_reference<item>> &target_index = active_items_index[speed];
+    std::list<item_reference> &target_list = active_items[speed];
+    if( target_index.empty() && !target_index.empty() ) {
+        // If the index has been cleared, rebuild it first.
+        for( item_reference &iter : target_list ) {
+            // Omit those expired references
+            if( iter.item_ref ) {
+                target_index.emplace( iter.item_ref.get(), iter.item_ref );
+            }
+        }
+    }
     // If the item is already in the cache for some reason, don't add a second reference
-    if( std::find_if( target_list.begin(),
-    target_list.end(), [&it]( const item_reference & active_item_ref ) {
-    return &it == active_item_ref.item_ref.get();
-    } ) != target_list.end() ) {
-        return true;
+    auto iter = target_index.find( &it );
+    if( iter != target_index.end() ) {
+        // Ensure it's really what we want, and hasn't expired
+        if( iter->second && iter->second.get() == &it ) {
+            return true;
+        }
     }
     item_reference ref{ location, it.get_safe_reference(), parent, pocket_chain };
     if( it.can_revive() ) {
@@ -79,6 +75,7 @@ bool active_item_cache::add( item &it, point location, item *parent,
         special_items[special_item_type::explosive].emplace_back( ref );
     }
     target_list.emplace_back( std::move( ref ) );
+    target_index.emplace( &it, it.get_safe_reference() );
     return true;
 }
 
@@ -98,6 +95,7 @@ std::vector<item_reference> active_item_cache::get()
                 all_cached_items.emplace_back( *it );
                 ++it;
             } else {
+                active_items_index[kv.first].clear();
                 it = kv.second.erase( it );
             }
         }
@@ -123,6 +121,7 @@ std::vector<item_reference> active_item_cache::get_for_processing()
                 ++it;
             } else {
                 // The item has been destroyed, so remove the reference from the cache
+                active_items_index[kv.first].clear();
                 it = kv.second.erase( it );
             }
         }
@@ -148,7 +147,7 @@ std::vector<item_reference> active_item_cache::get_special( special_item_type ty
     return matching_items;
 }
 
-void active_item_cache::subtract_locations( const point &delta )
+void active_item_cache::subtract_locations( const point_rel_ms &delta )
 {
     for( std::pair<const int, std::list<item_reference>> &pair : active_items ) {
         for( item_reference &ir : pair.second ) {
@@ -157,23 +156,24 @@ void active_item_cache::subtract_locations( const point &delta )
     }
 }
 
-void active_item_cache::rotate_locations( int turns, const point &dim )
+void active_item_cache::rotate_locations( int turns, const point_rel_ms &dim )
 {
     for( std::pair<const int, std::list<item_reference>> &pair : active_items ) {
         for( item_reference &ir : pair.second ) {
-            ir.location = ir.location.rotate( turns, dim );
+            // Should 'rotate' be propaged up to the typed coordinates?
+            ir.location = ir.location.rotate( turns, dim.raw() );
         }
     }
 }
 
-void active_item_cache::mirror( const point &dim, bool horizontally )
+void active_item_cache::mirror( const point_rel_ms &dim, bool horizontally )
 {
     for( std::pair<const int, std::list<item_reference>> &pair : active_items ) {
         for( item_reference &ir : pair.second ) {
             if( horizontally ) {
-                ir.location.x = dim.x - 1 - ir.location.x;
+                ir.location.x() = dim.x() - 1 - ir.location.x();
             } else {
-                ir.location.y = dim.y - 1 - ir.location.y;
+                ir.location.y() = dim.y() - 1 - ir.location.y();
             }
         }
     }

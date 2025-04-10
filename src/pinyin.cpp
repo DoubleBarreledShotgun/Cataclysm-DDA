@@ -1,11 +1,13 @@
 #include "pinyin.h"
-#include "third-party/pinyin/pinyin_data.hpp"
 
 #include <algorithm>
 #include <map>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
+
+#include "third-party/pinyin/pinyin_data.hpp"
 
 namespace pinyin
 {
@@ -76,7 +78,6 @@ bool pinyin_match( const std::u32string_view str, const std::u32string_view qry 
         combination_index++;
         all_combinations_tested = ( combination_index >= total_combination );
     }
-
 
     return false;
 }

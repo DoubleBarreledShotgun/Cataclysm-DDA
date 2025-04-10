@@ -17,8 +17,8 @@
       "sound_fail": "clang!",
       "ter_set": "t_thconc_floor",
       "items": [
-        { "item": "steel_lump", "count": [ 0, 2 ] },
-        { "item": "steel_chunk", "count": [ 1, 4 ] },
+        { "item": "mc_steel_lump", "count": [ 0, 2 ] },
+        { "item": "mc_steel_chunk", "count": [ 1, 4 ] },
         { "item": "scrap", "count": [ 3, 12 ] }
       ]
     }
@@ -74,11 +74,12 @@
       "sound_fail": "clang!",
       "ter_set": "t_pavement",
       "items": [
-        { "item": "steel_lump", "prob": 50 },
+        { "item": "mc_steel_lump", "prob": 50 },
         { "item": "pipe_fittings", "count": [ 2, 6 ] },
         { "item": "pipe", "count": [ 4, 8 ] },
-        { "item": "steel_chunk", "count": [ 1, 4 ] },
-        { "item": "scrap", "count": [ 3, 7 ] }
+        { "item": "mc_steel_chunk", "count": [ 1, 4 ] },
+        { "item": "scrap", "count": [ 3, 7 ] },
+        { "item": "hose", "count": 1 }
       ]
     }
   },
@@ -144,11 +145,12 @@
       "sound_fail": "clang!",
       "ter_set": "t_pavement",
       "items": [
-        { "item": "steel_lump", "prob": 50 },
-        { "item": "steel_chunk", "count": [ 1, 4 ] },
+        { "item": "mc_steel_lump", "prob": 50 },
+        { "item": "mc_steel_chunk", "count": [ 1, 4 ] },
         { "item": "pipe_fittings", "count": [ 2, 6 ] },
         { "item": "pipe", "count": [ 4, 8 ] },
-        { "item": "scrap", "count": [ 3, 7 ] }
+        { "item": "scrap", "count": [ 3, 7 ] },
+        { "item": "hose", "count": 1 }
       ]
     }
   },
@@ -192,11 +194,12 @@
       "sound_fail": "clang!",
       "ter_set": "t_pavement",
       "items": [
-        { "item": "steel_lump", "prob": 50 },
-        { "item": "steel_chunk", "count": [ 1, 4 ] },
+        { "item": "mc_steel_lump", "prob": 50 },
+        { "item": "mc_steel_chunk", "count": [ 1, 4 ] },
         { "item": "pipe_fittings", "count": [ 2, 6 ] },
         { "item": "pipe", "count": [ 4, 8 ] },
-        { "item": "scrap", "count": [ 3, 7 ] }
+        { "item": "scrap", "count": [ 3, 7 ] },
+        { "item": "hose", "count": 1 }
       ]
     }
   },
@@ -240,38 +243,12 @@
       "sound_fail": "clang!",
       "ter_set": "t_pavement",
       "items": [
-        { "item": "steel_lump", "prob": 50 },
-        { "item": "steel_chunk", "count": [ 1, 4 ] },
+        { "item": "mc_steel_lump", "prob": 50 },
+        { "item": "mc_steel_chunk", "count": [ 1, 4 ] },
         { "item": "pipe_fittings", "count": [ 2, 6 ] },
         { "item": "pipe", "count": [ 4, 8 ] },
-        { "item": "scrap", "count": [ 3, 7 ] }
-      ]
-    }
-  },
-  {
-    "type": "terrain",
-    "id": "t_atm",
-    "name": "ATM",
-    "description": "For your banking convenience, this Automated Teller Machine is fully capable of operating autonomously in the event of complete network failure.  You can deposit funds from cash cards and migrate all of your inflation-adjusted earnings to a single card.  This thing has seen better days; there's been a run on the bank, and this machine has the dents and cracks to prove it.",
-    "symbol": "&",
-    "color": "magenta",
-    "move_cost": 0,
-    "coverage": 55,
-    "flags": [ "TRANSPARENT", "NOITEM", "ALARMED", "REDUCE_SCENT", "PERMEABLE" ],
-    "examine_action": "atm",
-    "bash": {
-      "str_min": 40,
-      "str_max": 210,
-      "sound": "metal screeching!",
-      "sound_fail": "clang!",
-      "ter_set": "t_floor",
-      "items": [
-        { "item": "steel_chunk", "count": [ 1, 3 ] },
-        { "item": "scrap", "count": [ 4, 8 ] },
-        { "item": "money_strap_twenty", "count": [ 1, 59 ] },
-        { "item": "money_strap_fifty", "count": [ 1, 39 ] },
-        { "item": "money_twenty", "count": [ 1, 99 ] },
-        { "item": "money_fifty", "count": [ 1, 99 ] }
+        { "item": "scrap", "count": [ 3, 7 ] },
+        { "item": "hose", "count": 1 }
       ]
     }
   },
@@ -281,7 +258,7 @@
     "name": "ticket vendor",
     "description": "A machine with a little screen and slots, intended to take your money and provide you with a ticket.",
     "symbol": "&",
-    "looks_like": "t_atm",
+    "looks_like": "f_atm",
     "color": "blue",
     "move_cost": 0,
     "coverage": 55,
@@ -291,7 +268,7 @@
       "str_max": 210,
       "sound_fail": "clang!",
       "ter_set": "t_floor",
-      "items": [ { "item": "steel_chunk", "count": [ 1, 3 ] }, { "item": "scrap", "count": [ 4, 8 ] } ]
+      "items": [ { "item": "lc_steel_chunk", "count": [ 1, 3 ] }, { "item": "scrap", "count": [ 4, 8 ] } ]
     }
   },
   {
@@ -310,7 +287,7 @@
       "str_max": 210,
       "sound_fail": "clang!",
       "ter_set": "t_floor",
-      "items": [ { "item": "steel_chunk", "count": [ 1, 3 ] }, { "item": "scrap", "count": [ 4, 8 ] } ]
+      "items": [ { "item": "lc_steel_chunk", "count": [ 1, 3 ] }, { "item": "scrap", "count": [ 4, 8 ] } ]
     }
   },
   {
@@ -320,9 +297,11 @@
     "description": "A large wall-mounted panel, covered with fragile metal sheets that regulate airflow.",
     "symbol": "=",
     "color": "light_gray",
-    "looks_like": "t_chainfence_v",
+    "looks_like": "t_chainfence",
     "move_cost": 0,
     "coverage": 90,
+    "connect_groups": "WALL",
+    "connects_to": "WALL",
     "flags": [ "NOITEM", "WALL" ],
     "bash": {
       "str_min": 6,
@@ -350,7 +329,7 @@
       "sound": "metal screeching!",
       "sound_fail": "clang!",
       "ter_set": "t_missile_exploded",
-      "items": [ { "item": "scrap", "count": [ 4, 8 ] }, { "item": "plutonium", "charges": [ 0, 3 ] } ]
+      "items": [ { "item": "scrap", "count": [ 4, 8 ] }, { "item": "plutonium", "count": [ 0, 3 ] } ]
     }
   },
   {
@@ -369,8 +348,8 @@
       "sound_fail": "clang!",
       "ter_set": "t_metal_floor",
       "items": [
-        { "item": "steel_lump", "count": [ 0, 2 ] },
-        { "item": "steel_chunk", "count": [ 1, 3 ] },
+        { "item": "lc_steel_lump", "count": [ 0, 2 ] },
+        { "item": "lc_steel_chunk", "count": [ 1, 3 ] },
         { "item": "scrap", "count": [ 4, 8 ] }
       ]
     }
@@ -391,8 +370,8 @@
       "sound_fail": "clang!",
       "ter_set": "t_concrete",
       "items": [
-        { "item": "steel_lump", "count": [ 1, 2 ] },
-        { "item": "steel_chunk", "count": [ 1, 4 ] },
+        { "item": "lc_steel_lump", "count": [ 1, 2 ] },
+        { "item": "lc_steel_chunk", "count": [ 1, 4 ] },
         { "item": "scrap", "count": [ 3, 12 ] }
       ]
     }
@@ -445,6 +424,29 @@
   },
   {
     "type": "terrain",
+    "id": "t_truss_pillar",
+    "name": "truss pillar",
+    "description": "A hollow metal pillar composed of interconnected beams that distribute loads efficiently while maintaining stability and strength.",
+    "symbol": "H",
+    "color": "light_gray",
+    "looks_like": "t_radio_tower",
+    "move_cost": 0,
+    "flags": [ "TRANSPARENT", "NOITEM", "PERMEABLE", "THIN_OBSTACLE" ],
+    "bash": {
+      "str_min": 60,
+      "str_max": 210,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "ter_set": "t_concrete",
+      "items": [
+        { "item": "lc_steel_lump", "count": [ 1, 2 ] },
+        { "item": "lc_steel_chunk", "count": [ 1, 4 ] },
+        { "item": "scrap", "count": [ 3, 12 ] }
+      ]
+    }
+  },
+  {
+    "type": "terrain",
     "id": "t_sewage_pipe",
     "name": "high gauge pipe",
     "description": "A section of high gauge pipe.",
@@ -480,8 +482,81 @@
       "sound_fail": "clang!",
       "ter_set": "t_sewage",
       "items": [
-        { "item": "steel_lump", "prob": 50 },
-        { "item": "steel_chunk", "count": [ 1, 4 ] },
+        { "item": "lc_steel_lump", "count": [ 1, 4 ] },
+        { "item": "lc_steel_chunk", "count": [ 1, 4 ] },
+        { "item": "pipe_fittings", "count": [ 0, 4 ] },
+        { "item": "scrap", "count": [ 3, 7 ] }
+      ]
+    }
+  },
+  {
+    "type": "terrain",
+    "id": "t_drill_machinery",
+    "name": "drilling machinery",
+    "description": "All the machinery required to operate and control de drill string and the drill bit down below.  It is now inactive.",
+    "symbol": "&",
+    "color": "black",
+    "looks_like": "f_machinery_heavy",
+    "move_cost": 0,
+    "coverage": 50,
+    "flags": [ "NOITEM", "WALL" ],
+    "bash": {
+      "str_min": 20,
+      "str_max": 150,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "ter_set": "t_open_air",
+      "items": [
+        { "item": "steel_plate", "count": [ 0, 4 ] },
+        { "item": "ch_steel_chunk", "count": [ 1, 4 ] },
+        { "item": "scrap", "count": [ 3, 7 ] }
+      ]
+    }
+  },
+  {
+    "type": "terrain",
+    "id": "t_drill_string",
+    "name": "drill string",
+    "description": "An extremely resistant length of mechanical tubing used to reach deep under water and drill into pockets of oil.",
+    "symbol": "O",
+    "color": "black",
+    "looks_like": "t_little_column",
+    "move_cost": 0,
+    "coverage": 50,
+    "flags": [ "NOITEM", "THIN_OBSTACLE", "PERMEABLE" ],
+    "bash": {
+      "str_min": 30,
+      "str_max": 150,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "ter_set": "t_open_air",
+      "items": [
+        { "item": "steel_plate", "count": [ 0, 4 ] },
+        { "item": "ch_steel_chunk", "count": [ 1, 4 ] },
+        { "item": "scrap", "count": [ 3, 7 ] }
+      ]
+    }
+  },
+  {
+    "type": "terrain",
+    "id": "t_underwater_drill_string",
+    "name": "drill string",
+    "description": "An extremely resistant length of mechanical tubing used to reach deep under water and drill into pockets of oil.",
+    "symbol": "O",
+    "color": "blue",
+    "looks_like": "t_little_column",
+    "move_cost": 0,
+    "coverage": 50,
+    "flags": [ "NOITEM", "THIN_OBSTACLE", "PERMEABLE" ],
+    "bash": {
+      "str_min": 30,
+      "str_max": 150,
+      "sound": "metal screeching!",
+      "sound_fail": "clang!",
+      "ter_set": "t_saltwater_cube",
+      "items": [
+        { "item": "ch_steel_lump", "prob": 50 },
+        { "item": "ch_steel_chunk", "count": [ 1, 4 ] },
         { "item": "pipe_fittings", "count": [ 0, 4 ] },
         { "item": "scrap", "count": [ 3, 7 ] }
       ]
@@ -496,6 +571,8 @@
     "color": "dark_gray",
     "move_cost": 0,
     "coverage": 65,
+    "connect_groups": "WALL",
+    "connects_to": "WALL",
     "flags": [ "NOITEM", "WALL", "PERMEABLE" ],
     "bash": {
       "str_min": 6,
@@ -579,11 +656,13 @@
     "name": "nanofabricator control panel",
     "symbol": "&",
     "description": "A small computer panel attached to a nanofabricator.  It has a single slot for reading templates.",
-    "allowed_template_ids": [ "standard_template_construct", "debug_template" ],
+    "allowed_template_ids": [ "standard_template_construct", "standard_template_construct_combat_exoskeleton", "debug_template" ],
     "color": "red",
     "looks_like": "f_console",
     "move_cost": 0,
     "coverage": 50,
+    "connect_groups": "WALL",
+    "connects_to": "WALL",
     "flags": [ "WALL", "NOITEM", "PERMEABLE" ],
     "examine_action": "nanofab",
     "bash": {
@@ -617,6 +696,8 @@
     "move_cost": 0,
     "coverage": 40,
     "roof": "t_flat_roof",
+    "connect_groups": "WALL",
+    "connects_to": "WALL",
     "flags": [ "TRANSPARENT", "SEALED", "PLACE_ITEM", "WALL", "NO_SPOIL" ],
     "bash": {
       "str_min": 2,
@@ -640,8 +721,9 @@
     "move_cost": 0,
     "coverage": 50,
     "roof": "t_flat_roof",
+    "connect_groups": "INDOORFLOOR",
     "flags": [ "NOITEM", "INDOORS" ],
-    "examine_action": "slot_machine",
+    "examine_action": { "type": "effect_on_condition", "effect_on_conditions": [ "slot_machine_examine" ] },
     "bash": {
       "str_min": 8,
       "str_max": 150,
@@ -682,12 +764,13 @@
       "sound_fail": "thunk.",
       "ter_set": "t_covered_well",
       "items": [
-        { "item": "steel_chunk", "count": [ 0, 2 ] },
+        { "item": "ch_steel_chunk", "count": [ 0, 2 ] },
         { "item": "scrap", "count": [ 3, 6 ] },
         { "item": "pipe_fittings", "count": [ 0, 1 ] },
         { "item": "pipe", "count": [ 0, 2 ] }
       ]
     },
+    "liquid_source": { "id": "water" },
     "examine_action": "water_source"
   },
   {
@@ -713,6 +796,7 @@
       "ter_set": "t_covered_well",
       "items": [ { "item": "string_6", "count": [ 0, 18 ] }, { "item": "splinter", "count": [ 0, 24 ] } ]
     },
+    "liquid_source": { "id": "water" },
     "examine_action": "water_source"
   },
   {
@@ -725,7 +809,8 @@
     "color": "light_gray",
     "move_cost": 6,
     "coverage": 40,
-    "flags": [ "TRANSPARENT", "THIN_OBSTACLE", "SALT_WATER" ],
+    "liquid_source": { "id": "salt_water", "min_temp": 2.2 },
+    "flags": [ "TRANSPARENT", "THIN_OBSTACLE" ],
     "deconstruct": { "ter_set": "t_covered_well", "items": [ { "item": "well_pump", "count": 1 }, { "item": "pipe", "count": [ 1, 6 ] } ] },
     "bash": {
       "str_min": 15,
@@ -734,7 +819,7 @@
       "sound_fail": "thunk.",
       "ter_set": "t_dirt",
       "items": [
-        { "item": "steel_chunk", "count": [ 0, 2 ] },
+        { "item": "mc_steel_chunk", "count": [ 0, 2 ] },
         { "item": "scrap", "count": [ 3, 6 ] },
         { "item": "pipe_fittings", "count": [ 0, 1 ] },
         { "item": "pipe", "count": [ 0, 2 ] }
@@ -753,6 +838,7 @@
     "move_cost": 0,
     "coverage": 40,
     "flags": [ "TRANSPARENT", "LIQUIDCONT" ],
+    "liquid_source": { "id": "water_clean", "count": [ 40, 240 ] },
     "bash": {
       "str_min": 15,
       "str_max": 80,
@@ -760,7 +846,7 @@
       "sound_fail": "thunk.",
       "ter_set": "t_concrete",
       "items": [
-        { "item": "steel_chunk", "count": [ 0, 2 ] },
+        { "item": "mc_steel_chunk", "count": [ 0, 2 ] },
         { "item": "scrap", "count": [ 3, 6 ] },
         { "item": "pipe_fittings", "count": [ 0, 1 ] },
         { "item": "pipe", "count": [ 0, 2 ] }
@@ -778,6 +864,8 @@
     "looks_like": "f_machinery_electronic",
     "move_cost": 0,
     "coverage": 90,
+    "connect_groups": "WALL",
+    "connects_to": "WALL",
     "flags": [ "NOITEM", "WALL" ],
     "bash": { "str_min": 8, "str_max": 80, "sound": "whack!", "sound_fail": "clang!", "ter_set": "t_sai_box_damaged" },
     "deconstruct": {
@@ -805,6 +893,8 @@
     "looks_like": "f_wreckage",
     "move_cost": 0,
     "coverage": 90,
+    "connect_groups": "WALL",
+    "connects_to": "WALL",
     "flags": [ "NOITEM", "WALL" ],
     "bash": {
       "str_min": 6,
@@ -844,6 +934,8 @@
     "looks_like": "f_machinery_electronic",
     "move_cost": 0,
     "coverage": 90,
+    "connect_groups": "WALL",
+    "connects_to": "WALL",
     "flags": [ "TRANSPARENT", "FLAMMABLE", "NOITEM", "WALL", "PERMEABLE" ],
     "bash": {
       "str_min": 20,
@@ -854,7 +946,7 @@
       "sound_fail": "clang!",
       "items": [
         { "item": "scrap", "count": [ 8, 16 ] },
-        { "item": "steel_chunk", "count": [ 2, 6 ] },
+        { "item": "mc_steel_chunk", "count": [ 2, 6 ] },
         { "item": "ceramic_shard", "count": [ 0, 4 ] }
       ]
     },
@@ -864,7 +956,7 @@
         { "item": "cable", "charges": [ 8, 24 ] },
         { "item": "power_supply", "count": [ 4, 8 ] },
         { "item": "amplifier", "count": [ 8, 16 ] },
-        { "item": "steel_chunk", "count": [ 4, 16 ] },
+        { "item": "mc_steel_chunk", "count": [ 4, 16 ] },
         { "item": "scrap", "count": [ 12, 24 ] },
         { "item": "sheet_metal", "count": [ 6, 12 ] },
         { "item": "ceramic_shard", "count": [ 2, 6 ] }
@@ -881,6 +973,8 @@
     "looks_like": "f_machinery_electronic",
     "move_cost": 0,
     "coverage": 65,
+    "connect_groups": "WALL",
+    "connects_to": "WALL",
     "flags": [ "TRANSPARENT", "FLAMMABLE", "NOITEM", "WALL", "PERMEABLE" ],
     "bash": {
       "str_min": 20,
@@ -891,7 +985,7 @@
       "sound_fail": "clang!",
       "items": [
         { "item": "scrap", "count": [ 6, 12 ] },
-        { "item": "steel_chunk", "count": [ 1, 3 ] },
+        { "item": "mc_steel_chunk", "count": [ 1, 3 ] },
         { "item": "ceramic_shard", "count": [ 0, 2 ] }
       ]
     },
@@ -901,7 +995,7 @@
         { "item": "cable", "charges": [ 4, 12 ] },
         { "item": "power_supply", "count": [ 3, 6 ] },
         { "item": "amplifier", "count": [ 6, 12 ] },
-        { "item": "steel_chunk", "count": [ 2, 12 ] },
+        { "item": "mc_steel_chunk", "count": [ 2, 12 ] },
         { "item": "scrap", "count": [ 8, 18 ] },
         { "item": "sheet_metal", "count": [ 4, 8 ] },
         { "item": "ceramic_shard", "count": [ 1, 4 ] }
@@ -918,6 +1012,8 @@
     "looks_like": "f_machinery_electronic",
     "move_cost": 0,
     "coverage": 90,
+    "connect_groups": "WALL",
+    "connects_to": "WALL",
     "flags": [ "TRANSPARENT", "NOITEM", "WALL", "PERMEABLE" ],
     "bash": {
       "str_min": 20,
@@ -927,7 +1023,7 @@
       "sound_fail": "clang!",
       "items": [
         { "item": "scrap", "count": [ 5, 10 ] },
-        { "item": "steel_chunk", "count": [ 2, 4 ] },
+        { "item": "mc_steel_chunk", "count": [ 2, 4 ] },
         { "item": "plastic_chunk", "count": [ 2, 4 ] }
       ]
     },
@@ -957,6 +1053,8 @@
     "looks_like": "f_machinery_electronic",
     "move_cost": 0,
     "coverage": 65,
+    "connect_groups": "WALL",
+    "connects_to": "WALL",
     "flags": [ "TRANSPARENT", "NOITEM", "WALL", "PERMEABLE" ],
     "bash": {
       "str_min": 20,
@@ -966,7 +1064,7 @@
       "sound_fail": "clang!",
       "items": [
         { "item": "scrap", "count": [ 4, 8 ] },
-        { "item": "steel_chunk", "count": [ 1, 2 ] },
+        { "item": "mc_steel_chunk", "count": [ 1, 2 ] },
         { "item": "e_scrap", "count": [ 0, 2 ] },
         { "item": "circuit", "count": [ 1, 4 ] },
         { "item": "power_supply", "count": [ 0, 2 ] },
@@ -999,6 +1097,8 @@
     "color": "i_light_gray",
     "looks_like": "f_machinery_electronic",
     "move_cost": 0,
+    "connect_groups": "WALL",
+    "connects_to": "WALL",
     "flags": [ "TRANSPARENT", "NOITEM", "WALL", "PERMEABLE" ],
     "bash": {
       "str_min": 20,
@@ -1009,7 +1109,7 @@
       "items": [
         { "item": "cable", "charges": [ 0, 4 ] },
         { "item": "scrap", "count": [ 8, 12 ] },
-        { "item": "steel_chunk", "count": [ 2, 4 ] },
+        { "item": "mc_steel_chunk", "count": [ 2, 4 ] },
         { "item": "ceramic_shard", "count": [ 8, 16 ] }
       ]
     },
@@ -1017,7 +1117,7 @@
       "ter_set": "t_concrete",
       "items": [
         { "item": "cable", "charges": [ 4, 8 ] },
-        { "item": "steel_chunk", "count": [ 4, 6 ] },
+        { "item": "mc_steel_chunk", "count": [ 4, 6 ] },
         { "item": "scrap", "count": [ 12, 16 ] },
         { "item": "plastic_chunk", "count": [ 1, 4 ] },
         { "item": "ceramic_shard", "count": [ 12, 24 ] }
@@ -1033,6 +1133,8 @@
     "color": "light_gray",
     "looks_like": "f_machinery_electronic",
     "move_cost": 0,
+    "connect_groups": "WALL",
+    "connects_to": "WALL",
     "flags": [ "TRANSPARENT", "NOITEM", "WALL", "PERMEABLE" ],
     "bash": {
       "str_min": 20,
@@ -1042,7 +1144,7 @@
       "sound_fail": "clang!",
       "items": [
         { "item": "scrap", "count": [ 4, 8 ] },
-        { "item": "steel_chunk", "count": [ 2, 4 ] },
+        { "item": "mc_steel_chunk", "count": [ 2, 4 ] },
         { "item": "cable", "charges": [ 1, 4 ] },
         { "item": "ceramic_shard", "count": [ 0, 2 ] },
         { "item": "lead", "prob": 50 }
@@ -1076,6 +1178,8 @@
     "looks_like": "f_machinery_electronic",
     "move_cost": 0,
     "coverage": 50,
+    "connect_groups": "WALL",
+    "connects_to": "WALL",
     "flags": [ "TRANSPARENT", "NOITEM", "WALL", "PERMEABLE" ],
     "bash": {
       "str_min": 20,
@@ -1085,7 +1189,7 @@
       "sound_fail": "clang!",
       "items": [
         { "item": "scrap", "count": [ 10, 12 ] },
-        { "item": "steel_chunk", "count": [ 4, 6 ] },
+        { "item": "mc_steel_chunk", "count": [ 4, 6 ] },
         { "item": "lead", "charges": [ 2, 8 ] },
         { "item": "cable", "charges": [ 20, 60 ] },
         { "item": "sheet_metal", "count": [ 1, 2 ] },
@@ -1096,7 +1200,7 @@
       "ter_set": "t_concrete",
       "items": [
         { "item": "scrap", "count": [ 12, 16 ] },
-        { "item": "steel_chunk", "count": [ 4, 6 ] },
+        { "item": "mc_steel_chunk", "count": [ 4, 6 ] },
         { "item": "lead", "charges": [ 4, 16 ] },
         { "item": "cable", "charges": [ 60, 120 ] },
         { "item": "sheet_metal", "count": [ 2, 6 ] },
@@ -1114,6 +1218,8 @@
     "looks_like": "f_machinery_electronic",
     "move_cost": 0,
     "coverage": 50,
+    "connect_groups": "WALL",
+    "connects_to": "WALL",
     "flags": [ "TRANSPARENT", "NOITEM", "WALL", "PERMEABLE" ],
     "bash": {
       "str_min": 20,
@@ -1123,7 +1229,7 @@
       "sound_fail": "clang!",
       "items": [
         { "item": "scrap", "count": [ 10, 12 ] },
-        { "item": "steel_chunk", "count": [ 4, 6 ] },
+        { "item": "mc_steel_chunk", "count": [ 4, 6 ] },
         { "item": "lead", "charges": [ 8, 16 ] },
         { "item": "cable", "charges": [ 1, 20 ] },
         { "item": "sheet_metal", "count": [ 1, 2 ] },
@@ -1134,7 +1240,7 @@
       "ter_set": "t_concrete",
       "items": [
         { "item": "scrap", "count": [ 12, 16 ] },
-        { "item": "steel_chunk", "count": [ 4, 6 ] },
+        { "item": "mc_steel_chunk", "count": [ 4, 6 ] },
         { "item": "lead", "charges": [ 12, 32 ] },
         { "item": "cable", "charges": [ 20, 40 ] },
         { "item": "sheet_metal", "count": [ 2, 6 ] },
@@ -1150,12 +1256,13 @@
     "symbol": "=",
     "color": "brown",
     "move_cost": 6,
+    "connect_groups": "INDOORFLOOR",
     "flags": [ "TRANSPARENT", "PLACE_ITEM", "INDOORS" ],
     "coverage": 30,
     "deconstruct": {
       "ter_set": "t_rock_floor",
       "items": [
-        { "item": "wire", "count": 1 },
+        { "item": "lc_wire", "count": 1 },
         { "item": "pipe", "count": [ 1, 4 ] },
         { "item": "chain", "prob": 10 },
         { "item": "scrap", "count": [ 1, 5 ] },
@@ -1187,7 +1294,7 @@
       "sound_fail": "whump!",
       "items": [
         { "item": "scrap", "count": [ 1, 6 ] },
-        { "item": "steel_chunk", "count": [ 1, 4 ] },
+        { "item": "mc_steel_chunk", "count": [ 1, 4 ] },
         { "item": "hose", "count": [ 1, 3 ] }
       ]
     },
@@ -1195,7 +1302,7 @@
       "ter_set": "t_floor",
       "items": [
         { "item": "scrap", "count": [ 2, 9 ] },
-        { "item": "steel_chunk", "count": [ 2, 5 ] },
+        { "item": "mc_steel_chunk", "count": [ 2, 5 ] },
         { "item": "pipe_fittings", "count": [ 1, 2 ] },
         { "item": "hose", "count": [ 2, 6 ] }
       ]
@@ -1219,25 +1326,16 @@
       "sound": "crunch!",
       "sound_fail": "whump!",
       "items": [
-        { "item": "wire", "count": [ 1, 2 ] },
         { "item": "pipe", "count": [ 1, 2 ] },
-        { "item": "steel_lump", "count": [ 1, 5 ] },
-        { "item": "sheet_metal", "count": [ 1, 3 ] },
-        { "item": "steel_chunk", "count": [ 1, 5 ] }
+        { "item": "mc_steel_lump", "count": [ 1, 5 ] },
+        { "item": "sheet_metal", "count": [ 1, 2 ] },
+        { "item": "mc_steel_chunk", "count": [ 0, 2 ] }
       ]
     },
-    "deconstruct": {
-      "ter_set": "t_floor",
-      "items": [
-        { "item": "wire", "count": [ 2, 8 ] },
-        { "item": "pipe", "count": [ 1, 3 ] },
-        { "item": "pipe_fittings", "count": [ 1, 2 ] },
-        { "item": "steel_lump", "count": [ 1, 8 ] },
-        { "item": "sheet_metal", "count": [ 1, 6 ] },
-        { "item": "steel_chunk", "count": [ 1, 10 ] }
-      ]
-    },
-    "flags": [ "CONTAINER", "SEALED", "PLACE_ITEM", "WALL", "MINEABLE" ]
+    "deconstruct": { "ter_set": "t_floor", "items": [ { "item": "55gal_drum" }, { "item": "water_faucet" } ] },
+    "connect_groups": "WALL",
+    "connects_to": "WALL",
+    "flags": [ "CONTAINER", "LIQUIDCONT", "NOITEM", "WALL" ]
   },
   {
     "id": "t_rockyobstacle",
@@ -1255,6 +1353,7 @@
       "sound_fail": "whump!",
       "items": [ { "item": "rock_large", "count": [ 0, 20 ] }, { "item": "sharp_rock", "count": [ 0, 16 ] } ]
     },
+    "deconstruct": { "ter_set": "t_dirt", "items": [ { "item": "rock_large", "count": 22 } ] },
     "flags": [ "TRANSPARENT", "THIN_OBSTACLE", "SHORT", "ROUGH", "UNSTABLE", "PERMEABLE", "EASY_DECONSTRUCT" ]
   },
   {
@@ -1266,6 +1365,7 @@
     "color": "green",
     "looks_like": "t_pit",
     "move_cost": 0,
+    "connect_groups": "INDOORFLOOR",
     "flags": [ "TRANSPARENT", "CONTAINER", "PLACE_ITEM", "INDOORS" ],
     "deconstruct": { "ter_set": "t_pit", "items": [ { "item": "rock", "count": 40 }, { "item": "stick", "count": [ 16, 16 ] } ] },
     "bash": {
@@ -1360,6 +1460,7 @@
     "coverage": 30,
     "floor_bedding_warmth": 1000,
     "comfort": 3,
+    "connect_groups": "INDOORFLOOR",
     "flags": [
       "TRANSPARENT",
       "CONTAINER",
@@ -1371,6 +1472,7 @@
       "HIDE_PLACE",
       "EASY_DECONSTRUCT"
     ],
+    "deconstruct": { "ter_set": "t_pit_shallow", "items": [ { "item": "stick", "count": 12 }, { "item": "pine_bough", "count": 24 } ] },
     "bash": {
       "str_min": 4,
       "str_max": 60,
@@ -1392,6 +1494,7 @@
     "comfort": 4,
     "move_cost": 2,
     "coverage": 30,
+    "connect_groups": "INDOORFLOOR",
     "flags": [
       "TRANSPARENT",
       "CONTAINER",
@@ -1402,6 +1505,10 @@
       "HIDE_PLACE",
       "EASY_DECONSTRUCT"
     ],
+    "deconstruct": {
+      "ter_set": "t_pit_shallow",
+      "items": [ { "item": "stick", "count": 12 }, { "item": "pine_bough", "count": 24 }, { "item": "withered", "count": 80 } ]
+    },
     "bash": {
       "str_min": 4,
       "str_max": 60,
@@ -1435,6 +1542,7 @@
         { "item": "pine_bough", "count": [ 0, 2 ] }
       ]
     },
+    "connect_groups": "INDOORFLOOR",
     "flags": [ "TRANSPARENT", "CONTAINER", "FLAMMABLE_ASH", "THIN_OBSTACLE", "REDUCE_SCENT", "INDOORS", "MOUNTABLE" ]
   },
   {
@@ -1462,27 +1570,65 @@
       "ter_set": "t_dirt",
       "items": [ { "item": "pointy_stick", "count": 4 }, { "item": "string_6", "count": 4 }, { "item": "tarp", "count": 1 } ]
     },
+    "connect_groups": "INDOORFLOOR",
     "flags": [ "TRANSPARENT", "FLAMMABLE", "THIN_OBSTACLE", "INDOORS", "MOUNTABLE", "EASY_DECONSTRUCT" ]
   },
   {
-    "type": "furniture",
-    "id": "f_standing_pressure_tank",
-    "name": "standing propane tank",
-    "description": "A huge metal tank that can be used to safely store large amounts of propane.",
-    "symbol": "O",
-    "color": "light_gray",
-    "move_cost_mod": -1,
-    "coverage": 90,
-    "required_str": -1,
-    "flags": [ "TRANSPARENT", "FLAMMABLE", "NOITEM", "SEALED", "CONTAINER", "REDUCE_SCENT", "PERMEABLE", "LIQUIDCONT" ],
-    "examine_action": "gaspump",
-    "deconstruct": { "items": [ { "item": "large_propane_tank", "count": 3 } ] },
+    "type": "terrain",
+    "id": "t_brick_oven_base",
+    "name": "brick oven base",
+    "symbol": "=",
+    "description": "A flat assembly of carefully stacked bricks that is not quite an oven.",
+    "color": "yellow",
+    "move_cost": 4,
+    "deconstruct": { "ter_set": "t_dirt", "items": [ { "item": "fire_brick", "count": 30 } ] },
     "bash": {
-      "str_min": 10,
-      "str_max": 20,
-      "sound": "metal screeching!",
-      "sound_fail": "clang!",
-      "items": [ { "item": "scrap", "count": [ 8, 32 ] } ]
+      "str_min": 16,
+      "str_max": 25,
+      "sound": "whack!",
+      "sound_fail": "thunk.",
+      "ter_set": "t_dirt",
+      "items": [ { "item": "fire_brick", "count": [ 15, 20 ] } ]
+    }
+  },
+  {
+    "type": "terrain",
+    "id": "t_brick_oven_struct",
+    "looks_like": "f_fireplace",
+    "name": "exposed brick oven",
+    "symbol": "#",
+    "description": "A large brick oven that could make several pizzas at once.  This one seems to be missing its door, and cannot be used in such a state.",
+    "color": "yellow",
+    "move_cost": 0,
+    "flags": [ "REDUCE_SCENT", "CONTAINER", "FIRE_CONTAINER", "SUPPRESS_SMOKE", "PERMEABLE" ],
+    "deconstruct": { "ter_set": "t_dirt", "items": [ { "item": "fire_brick", "count": 90 } ] },
+    "bash": {
+      "str_min": 25,
+      "str_max": 50,
+      "sound": "whack!",
+      "sound_fail": "thunk.",
+      "ter_set": "t_dirt",
+      "items": [ { "item": "fire_brick", "count": [ 45, 75 ] } ]
+    }
+  },
+  {
+    "type": "terrain",
+    "id": "t_brick_oven",
+    "looks_like": "f_fireplace",
+    "name": "brick oven",
+    "symbol": "#",
+    "description": "A large brick oven that could make several pizzas at once.",
+    "color": "red",
+    "move_cost": 0,
+    "flags": [ "REDUCE_SCENT", "NOITEM", "PERMEABLE", "CONTAINER", "FIRE_CONTAINER", "SUPPRESS_SMOKE" ],
+    "deconstruct": { "ter_set": "t_dirt", "items": [ { "item": "fire_brick", "count": 90 } ] },
+    "bash": {
+      "str_min": 25,
+      "str_max": 50,
+      "sound": "whack!",
+      "sound_fail": "thunk.",
+      "ter_set": "t_dirt",
+      "items": [ { "item": "fire_brick", "count": [ 45, 75 ] } ]
     }
   }
 ]

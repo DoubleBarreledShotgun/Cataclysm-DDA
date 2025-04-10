@@ -15,6 +15,11 @@
     "text": "Enjoyed a conversation"
   },
   {
+    "id": "morale_chat_uncaring",
+    "type": "morale_type",
+    "text": "Had to suffer through an inane conversation"
+  },
+  {
     "id": "morale_ate_with_table",
     "type": "morale_type",
     "text": "Ate with a table and chair"
@@ -205,6 +210,11 @@
     "text": "Feeling bad"
   },
   {
+    "id": "morale_bad_protein_bar",
+    "type": "morale_type",
+    "text": "Demoralizing food"
+  },
+  {
     "id": "morale_killed_innocent",
     "type": "morale_type",
     "text": "Killed an innocent person"
@@ -283,11 +293,6 @@
     "id": "morale_perm_hoarder",
     "type": "morale_type",
     "text": "Hoarder"
-  },
-  {
-    "id": "morale_perm_fancy",
-    "type": "morale_type",
-    "text": "Stylish"
   },
   {
     "id": "morale_perm_optimist",
@@ -372,7 +377,7 @@
   {
     "id": "morale_butcher",
     "type": "morale_type",
-    "text": "Anguished by memories of butchering a human corpse"
+    "text": "Anguished by memories of butchering a person's corpse"
   },
   {
     "id": "morale_gravedigger",
@@ -418,5 +423,35 @@
     "id": "morale_impossible_shape",
     "type": "morale_type",
     "text": "Saw something that hurts to remember"
+  },
+  {
+    "id": "morale_afs_drugs",
+    "type": "morale_type",
+    "text": "Chemical enhancement moodswing"
+  },
+  {
+    "id": "morale_social",
+    "type": "morale_type",
+    "text": "Spent time around allies"
+  },
+  {
+    "id": "morale_asocial",
+    "type": "morale_type",
+    "text": "Spent time alone"
+  },
+  {
+    "id": "morale_bile",
+    "type": "morale_type",
+    "text": "Covered in bile"
+  },
+  {
+    "id": "morale_sunrise",
+    "type": "morale_type",
+    "text": "Saw the sun rise"
+  },
+  {
+    "id": "morale_sunset",
+    "type": "morale_type",
+    "text": "Saw the sun set"
   }
 ]

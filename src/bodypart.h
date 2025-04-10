@@ -5,34 +5,32 @@
 #include <array>
 #include <climits>
 #include <cstddef>
-#include <initializer_list>
-#include <iosfwd>
+#include <map>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "damage.h"
 #include "enums.h"
 #include "flat_set.h"
-#include "int_id.h"
-#include "mod_tracker.h"
-#include "string_id.h"
-#include "translations.h"
 #include "subbodypart.h"
-#include "localized_comparator.h"
+#include "translation.h"
 #include "type_id.h"
+#include "units.h"
+#include "weather.h"
 
+class Creature;
 class JsonObject;
 class JsonOut;
-class JsonValue;
 struct body_part_type;
+struct localized_comparator;
 template <typename E> struct enum_traits;
+template <typename T> class generic_factory;
 
-using bodypart_str_id = string_id<body_part_type>;
 using bodypart_id = int_id<body_part_type>;
 
-extern const bodypart_str_id body_part_bp_null;
 extern const bodypart_str_id body_part_head;
 extern const bodypart_str_id body_part_eyes;
 extern const bodypart_str_id body_part_mouth;
@@ -45,8 +43,6 @@ extern const bodypart_str_id body_part_leg_l;
 extern const bodypart_str_id body_part_foot_l;
 extern const bodypart_str_id body_part_leg_r;
 extern const bodypart_str_id body_part_foot_r;
-
-extern const sub_bodypart_str_id sub_body_part_sub_limb_debug;
 
 // The order is important ; pldata.h has to be in the same order
 enum body_part : int {
@@ -69,8 +65,6 @@ template<>
 struct enum_traits<body_part> {
     static constexpr body_part last = body_part::num_bp;
 };
-
-enum class side : int;
 
 // Drench cache
 enum water_tolerance {
@@ -205,7 +199,7 @@ struct body_part_type {
 
         std::vector<std::pair<bodypart_str_id, mod_id>> src;
 
-        /** Sub-location of the body part used for encumberance, coverage and determining protection
+        /** Sub-location of the body part used for encumbrance, coverage and determining protection
          */
         std::vector<sub_bodypart_str_id> sub_parts;
 
@@ -236,6 +230,11 @@ struct body_part_type {
 
         // Limb-specific attacks
         std::set<matec_id> techniques;
+
+        // Effect to trigger on being winded
+        efftype_id windage_effect;
+        // Effect to trigger on draining all bionic power
+        efftype_id no_power_effect;
 
         // Effects to trigger on getting hit
         std::vector<bp_onhit_effect> effects_on_hit;
@@ -281,11 +280,10 @@ struct body_part_type {
         //Morale parameters
         float hot_morale_mod = 0.0f;
         float cold_morale_mod = 0.0f;
-        float stylish_bonus = 0.0f;
         int squeamish_penalty = 0;
         bool feels_discomfort = true;
 
-        int fire_warmth_bonus = 0;
+        units::temperature_delta fire_warmth_bonus = 0_C_delta;
 
         //Innate environmental protection
         int env_protection = 0;
@@ -301,16 +299,22 @@ struct body_part_type {
         int ugliness_mandatory = 0;
 
         // Intrinsic temperature bonus of the bodypart
-        int temp_min = 0;
+        units::temperature_delta temp_min = 0_C_delta;
         // Temperature bonus to apply when not overheated
-        int temp_max = 0;
+        units::temperature_delta temp_max = 0_C_delta;
         int drench_max = 0;
         int drench_increment = 2;
-        int drying_chance = 1;
-        int drying_increment = 1;
+        float drying_rate = 1.0f;
         // Wetness morale bonus/malus of the limb
         int wet_morale = 0;
         int technique_enc_limit = 50;
+
+        // this is the number of millijoules used per stamina point
+        int power_efficiency = 0;
+
+        // These limbs should be covered by armor covering this limb (1:1 coverage)
+        // TODO: Coverage/Encumbrance multiplier
+        std::vector<bodypart_str_id> similar_bodyparts;
 
     private:
         int bionic_slots_ = 0;
@@ -357,7 +361,10 @@ struct body_part_type {
             return bionic_slots_;
         }
 
+        damage_instance unarmed_damage_instance() const;
         float unarmed_damage( const damage_type_id &dt ) const;
+        // return the total amount of unarmed damage this limb would do
+        float total_unarmed_damage() const;
         float unarmed_arpen( const damage_type_id &dt ) const;
 
         float damage_resistance( const damage_type_id &dt ) const;
@@ -399,6 +406,7 @@ struct layer_details {
 };
 
 struct encumbrance_data {
+    // value modified in get_final_encumbrance() for final result
     int encumbrance = 0;
     int armor_encumbrance = 0;
     int layer_penalty = 0;
@@ -406,9 +414,9 @@ struct encumbrance_data {
     std::array<layer_details, static_cast<size_t>( layer_level::NUM_LAYER_LEVELS )>
     layer_penalty_details;
 
-    bool add_sub_locations( layer_level level, const std::vector<sub_bodypart_id> &sub_parts );
+    bool add_sub_location( layer_level level, sub_bodypart_id sbp );
 
-    bool add_sub_locations( layer_level level, const std::vector<sub_bodypart_str_id> &sub_parts );
+    bool add_sub_location( layer_level level, sub_bodypart_str_id sbp );
 
     void layer( const layer_level level, const int encumbrance, bool conflicts ) {
         layer_penalty_details[static_cast<size_t>( level )].layer( encumbrance, conflicts );
@@ -435,8 +443,8 @@ class bodypart
         int hp_max = 0;
 
         int wetness = 0;
-        int temp_cur = 5000; // BODYTEMP_NORM = 5000
-        int temp_conv = 5000;
+        units::temperature temp_cur = BODYTEMP_NORM;
+        units::temperature temp_conv = BODYTEMP_NORM;
         int frostbite_timer = 0;
 
         int healed_total = 0;
@@ -450,7 +458,7 @@ class bodypart
         // adjust any limb "value" based on how wounded the limb is. scaled to 0-75%
         float wound_adjusted_limb_value( float val ) const;
         // Same idea as for wounds, though not all scores get this applied. Should be applied after wounds.
-        float encumb_adjusted_limb_value( float val ) const;
+        float encumb_adjusted_limb_value( const Creature &mon, float val ) const;
         // If the limb score is affected by a skill, adjust it by the skill's level (used for swimming)
         float skill_adjusted_limb_value( float val, int skill ) const;
     public:
@@ -465,39 +473,48 @@ class bodypart
 
         float get_wetness_percentage() const;
 
+        bool compare_encumbrance_data( const bodypart &bp ) const;
+        int get_final_encumbrance( const Creature &mon ) const;
+        int get_layer_penalty() const;
         int get_encumbrance_threshold() const;
         // Check if we're above our encumbrance limit
-        bool is_limb_overencumbered() const;
-        bool has_conditional_flag( const json_character_flag &flag ) const;
+        bool is_limb_overencumbered( const Creature &mon ) const;
+        bool has_conditional_flag( const Creature &mon, const json_character_flag &flag ) const;
 
         // Get our limb attacks
-        std::set<matec_id> get_limb_techs() const;
+        std::set<matec_id> get_limb_techs( const Creature &mon ) const;
+
+        /** Returns the string id of the effect to be used. */
+        efftype_id get_windage_effect() const;
+        /** Returns the string id of the effect to be used. */
+        efftype_id get_no_power_effect() const;
 
         // Get onhit effects
         std::vector<bp_onhit_effect> get_onhit_effects( damage_type_id dtype ) const;
 
         // Get modified limb score as defined in limb_scores.json.
         // override forces the limb score to be affected by encumbrance/wounds (-1 == no override).
-        float get_limb_score( const limb_score_id &score, int skill = -1, int override_encumb = -1,
+        float get_limb_score( const Creature &mon, const limb_score_id &score, int skill = -1,
+                              int override_encumb = -1,
                               int override_wounds = -1 ) const;
         float get_limb_score_max( const limb_score_id &score ) const;
 
         int get_hp_cur() const;
         int get_hp_max() const;
+        float get_hit_size() const;
         int get_healed_total() const;
         int get_damage_bandaged() const;
         int get_damage_disinfected() const;
         int get_drench_capacity() const;
         int get_wetness() const;
         int get_frostbite_timer() const;
-        int get_temp_cur() const;
-        int get_temp_conv() const;
+        units::temperature get_temp_cur() const;
+        units::temperature get_temp_conv() const;
         int get_bmi_encumbrance_threshold() const;
         float get_bmi_encumbrance_scalar() const;
+        int get_power_efficiency() const;
 
         std::array<int, NUM_WATER_TOLERANCE> get_mut_drench() const;
-
-        const encumbrance_data &get_encumbrance_data() const;
 
         void set_hp_cur( int set );
         void set_hp_max( int set );
@@ -505,8 +522,8 @@ class bodypart
         void set_damage_bandaged( int set );
         void set_damage_disinfected( int set );
         void set_wetness( int set );
-        void set_temp_cur( int set );
-        void set_temp_conv( int set );
+        void set_temp_cur( units::temperature set );
+        void set_temp_conv( units::temperature set );
         void set_frostbite_timer( int set );
 
         void set_encumbrance_data( const encumbrance_data &set );
@@ -519,8 +536,8 @@ class bodypart
         void mod_damage_bandaged( int mod );
         void mod_damage_disinfected( int mod );
         void mod_wetness( int mod );
-        void mod_temp_cur( int mod );
-        void mod_temp_conv( int mod );
+        void mod_temp_cur( units::temperature_delta mod );
+        void mod_temp_conv( units::temperature_delta mod );
         void mod_frostbite_timer( int mod );
 
         void serialize( JsonOut &json ) const;

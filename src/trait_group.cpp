@@ -4,17 +4,16 @@
 #include <cstddef>
 #include <map>
 #include <string>
-#include <type_traits>
 #include <utility>
 
 #include "cata_assert.h"
 #include "debug.h"
-#include "json.h"
+#include "flexbuffer_json.h"
 #include "mutation.h"
 #include "rng.h"
 #include "string_formatter.h"
 #include "translations.h"
-#include "ui.h"
+#include "uilist.h"
 
 using namespace trait_group;
 
@@ -99,7 +98,7 @@ void trait_group::debug_spawn()
         // Spawn traits from the group 100 times
         std::map<std::string, int> traitnames;
         for( size_t a = 0; a < 100; a++ ) {
-            const auto traits = traits_from( groups[index] );
+            const Trait_list traits = traits_from( groups[index] );
             for( const trait_and_var &tr : traits ) {
                 traitnames[tr.name()]++;
             }

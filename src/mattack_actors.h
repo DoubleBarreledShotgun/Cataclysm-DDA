@@ -3,23 +3,24 @@
 #define CATA_SRC_MATTACK_ACTORS_H
 
 #include <climits>
-#include <iosfwd>
 #include <map>
-#include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
 #include "bodypart.h"
+#include "coords_fwd.h"
 #include "damage.h"
 #include "magic.h"
 #include "mattack_common.h"
-#include "translations.h"
+#include "mtype.h"
+#include "translation.h"
+#include "type_id.h"
 #include "weighted_list.h"
 
 class Creature;
 class JsonObject;
 class monster;
-struct mon_effect_data;
 
 class leap_actor : public mattack_actor
 {
@@ -33,6 +34,12 @@ class leap_actor : public mattack_actor
         bool prefer_leap = false;
         // Leap completely randomly regardless of target distance/direction
         bool random_leap = false;
+        // Leap including terrains it doesn't usually move
+        // i.e. Aquatic monsters leap onto land
+        bool ignore_dest_terrain = false;
+        // Leap including tiles where there is something it would usually avoid,
+        // such as open air, fire, or traps
+        bool ignore_dest_danger = false;
         int move_cost = 0;
         // Range to target below which we don't consider jumping at all
         float min_consider_range = 0.0f;
@@ -66,6 +73,37 @@ class mon_spellcasting_actor : public mattack_actor
         std::unique_ptr<mattack_actor> clone() const override;
 };
 
+struct grab {
+    // Intensity of grab effect applied, defaults to the monster's defined grab_strength unless specified
+    int grab_strength;
+    // Percent chance to initiate a pull
+    int pull_chance;
+    // Ratio of pullee:puller weight
+    float pull_weight_ratio;
+    // Which effect should we apply on a successful grab to our target (bp)
+    // Limited to one GRAB-flagged effect per bp
+    efftype_id grab_effect;
+    // If true will attempt to remove all other GRAB flagged effects from the target and cancel the attack on failure
+    bool exclusive_grab = false;
+    // If true drags/pulls fail when targeting a character in a seat with seatbelts
+    bool respect_seatbelts = true;
+    // Distance the enemy drags you on successful drag attempt (also enable dragging in the first place)
+    int drag_distance;
+    // Deviation of each dragging step from a straight line away from the opponent
+    int drag_deviation;
+    // Number of drag steps which give you a grab break attempt
+    int drag_grab_break_distance;
+    // Movecost modifier for drag-related movements
+    float drag_movecost_mod;
+    // Messages for pulls and drags, those are mutually exclusive
+    translation pull_msg_u;
+    translation pull_fail_msg_u;
+    translation pull_msg_npc;
+    translation pull_fail_msg_npc;
+    void load_grab( const JsonObject &jo );
+    bool was_loaded = false;
+};
+
 class melee_actor : public mattack_actor
 {
     public:
@@ -92,12 +130,18 @@ class melee_actor : public mattack_actor
         bool blockable = true;
         // Determines if effects are only applied on damagin attacks
         bool effects_require_dmg = true;
+        // Determines if effects are only applied on non bionic limbs
+        bool effects_require_organic = false;
         // If non-zero, the attack will fling targets, 10 throw_strength = 1 tile range
         int throw_strength = 0;
         // Limits on target bodypart hit sizes
         int hitsize_min = -1;
         int hitsize_max = -1;
         bool attack_upper = true;
+        grab grab_data;
+        bool is_grab = false;
+
+        std::vector<effect_on_condition_id> eoc;
 
         /**
          * If empty, regular melee roll body part selection is used.
@@ -131,13 +175,16 @@ class melee_actor : public mattack_actor
         /** Message for throwing a non-player. */
         translation throw_msg_npc;
 
-        melee_actor();
+        melee_actor() = default;
         ~melee_actor() override = default;
 
         virtual Creature *find_target( monster &z ) const;
         virtual void on_damage( monster &z, Creature &target, dealt_damage_instance &dealt ) const;
 
         void load_internal( const JsonObject &obj, const std::string &src ) override;
+        /* Dedicated grab faction. Possible returns: -1 fails silently (attempting another attack instead)
+        0 fails loudly (resetting the cooldown), 1 succeeds */
+        int do_grab( monster &, Creature *target, bodypart_id bp_id ) const;
         bool call( monster & ) const override;
         std::unique_ptr<mattack_actor> clone() const override;
 };
@@ -217,7 +264,7 @@ class gun_actor : public mattack_actor
         bool require_sunlight = false;
 
         bool try_target( monster &z, Creature &target ) const;
-        void shoot( monster &z, const tripoint &target, const gun_mode_id &mode,
+        bool shoot( monster &z, const tripoint_bub_ms &target, const gun_mode_id &mode,
                     int inital_recoil = 0 ) const;
         int get_max_range() const;
 

@@ -1,24 +1,53 @@
-#include "catch/catch.hpp"
+#include <array>
+#include <clocale>
+#include <cmath>
+#include <functional>
+#include <list>
+#include <locale>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
 
+#include "activity_tracker.h"
+#include "avatar.h"
+#include "bodypart.h"
+#include "calendar.h"
+#include "cata_catch.h"
+#include "cata_scope_helpers.h"
 #include "cata_utility.h"
+#include "character_attire.h"
+#include "coordinates.h"
+#include "effect.h"
 #include "game.h"
 #include "game_constants.h"
-#include "player_helpers.h"
+#include "item.h"
+#include "magic.h"
 #include "map.h"
 #include "map_helpers.h"
 #include "mission.h"
 #include "monster.h"
-#include "morale.h"
-#include "overmapbuffer.h"
 #include "options_helpers.h"
+#include "overmap.h"
+#include "overmap_ui.h"
+#include "overmapbuffer.h"
+#include "pimpl.h"
+#include "player_helpers.h"
+#include "point.h"
+#include "string_formatter.h"
+#include "translation.h"
+#include "type_id.h"
+#include "units.h"
 #include "weather.h"
 #include "weather_type.h"
 #include "widget.h"
 
-#include <clocale>
-
 // Needed for screen scraping
-#if (defined(TILES) || defined(_WIN32))
+#if defined(TILES)
+#include <cstddef>
+
+#include "cursesdef.h"
 #include "cursesport.h"
 #endif
 
@@ -40,9 +69,18 @@ static const efftype_id effect_infected( "infected" );
 static const flag_id json_flag_SPLINT( "SPLINT" );
 const static flag_id json_flag_W_DISABLED_WHEN_EMPTY( "W_DISABLED_WHEN_EMPTY" );
 
+static const itype_id itype_arm_splint( "arm_splint" );
 static const itype_id itype_blindfold( "blindfold" );
 static const itype_id itype_ear_plugs( "ear_plugs" );
 static const itype_id itype_rad_badge( "rad_badge" );
+static const itype_id itype_sneakers( "sneakers" );
+static const itype_id itype_swim_fins( "swim_fins" );
+static const itype_id itype_test_hazmat_suit( "test_hazmat_suit" );
+static const itype_id itype_test_socks( "test_socks" );
+static const itype_id itype_test_zentai( "test_zentai" );
+
+static const morale_type morale_food_good( "morale_food_good" );
+static const morale_type morale_killed_innocent( "morale_killed_innocent" );
 
 static const move_mode_id move_mode_crouch( "crouch" );
 static const move_mode_id move_mode_prone( "prone" );
@@ -82,9 +120,10 @@ static const widget_id widget_test_compass_N_nowidth( "test_compass_N_nowidth" )
 static const widget_id widget_test_compass_legend_1( "test_compass_legend_1" );
 static const widget_id widget_test_compass_legend_3( "test_compass_legend_3" );
 static const widget_id widget_test_compass_legend_5( "test_compass_legend_5" );
+static const widget_id widget_test_custom_var_dynamic_range( "test_custom_var_dynamic_range" );
+static const widget_id widget_test_custom_var_static_range( "test_custom_var_static_range" );
 static const widget_id widget_test_dex_color_num( "test_dex_color_num" );
 static const widget_id widget_test_disabled_when_empty( "test_disabled_when_empty" );
-static const widget_id widget_test_fatigue_clause( "test_fatigue_clause" );
 static const widget_id widget_test_focus_num( "test_focus_num" );
 static const widget_id widget_test_health_clause( "test_health_clause" );
 static const widget_id widget_test_health_color_num( "test_health_color_num" );
@@ -109,6 +148,7 @@ static const widget_id widget_test_overmap_3x3_text( "test_overmap_3x3_text" );
 static const widget_id widget_test_per_color_num( "test_per_color_num" );
 static const widget_id widget_test_pool_graph( "test_pool_graph" );
 static const widget_id widget_test_rad_badge_text( "test_rad_badge_text" );
+static const widget_id widget_test_sleepiness_clause( "test_sleepiness_clause" );
 static const widget_id widget_test_speed_num( "test_speed_num" );
 static const widget_id widget_test_stamina_graph( "test_stamina_graph" );
 static const widget_id widget_test_stamina_num( "test_stamina_num" );
@@ -131,7 +171,7 @@ static const widget_id widget_test_weight_clauses_normal( "test_weight_clauses_n
 
 // dseguin 2022 - Ugly hack to scrape content from the window object.
 // Scrapes the window w at origin, reading the number of cols and rows.
-#if defined(TILES) || defined(_WIN32)
+#if defined(TILES)
 static std::vector<std::string> scrape_win_at(
     catacurses::window &w, const point &origin, int cols, int rows )
 {
@@ -140,7 +180,7 @@ static std::vector<std::string> scrape_win_at(
     cata_cursesport::WINDOW *win = static_cast<cata_cursesport::WINDOW *>( w.get() );
 
     for( int i = origin.y; i < rows && static_cast<size_t>( i ) < win->line.size(); i++ ) {
-        lines.emplace_back( std::string() );
+        lines.emplace_back( );
         for( int j = origin.x; j < cols && static_cast<size_t>( j ) < win->line[i].chars.size(); j++ ) {
             lines[i] += win->line[i].chars[j].ch;
         }
@@ -162,7 +202,7 @@ static std::vector<std::string> scrape_win_at(
 }
 #endif
 
-TEST_CASE( "widget value strings", "[widget][value][string]" )
+TEST_CASE( "widget_value_strings", "[widget][value][string]" )
 {
     SECTION( "numeric values" ) {
         widget focus = widget_test_focus_num.obj();
@@ -234,7 +274,7 @@ TEST_CASE( "widget value strings", "[widget][value][string]" )
     }
 }
 
-TEST_CASE( "text widgets", "[widget][text]" )
+TEST_CASE( "text_widgets", "[widget][text]" )
 {
     SECTION( "words Zero-Ten for values 0-10" ) {
         widget words = widget_test_text_widget.obj();
@@ -242,11 +282,11 @@ TEST_CASE( "text widgets", "[widget][text]" )
         words._var_max = 10;
         REQUIRE( words._style == "text" );
 
-        CHECK( words.text( 0, false ) == "Zero" );
+        CHECK( words.text( false, 0 ) == "Zero" );
     }
 }
 
-TEST_CASE( "number widgets with color", "[widget][number][color]" )
+TEST_CASE( "number_widgets_with_color", "[widget][number][color]" )
 {
     SECTION( "numbers 0-2 with 3 colors" ) {
         widget colornum = widget_test_color_number_widget.obj();
@@ -263,7 +303,7 @@ TEST_CASE( "number widgets with color", "[widget][number][color]" )
     }
 }
 
-TEST_CASE( "graph widgets", "[widget][graph]" )
+TEST_CASE( "graph_widgets", "[widget][graph]" )
 {
     SECTION( "graph widgets" ) {
         SECTION( "bucket fill with 12 states" ) {
@@ -331,7 +371,7 @@ TEST_CASE( "graph widgets", "[widget][graph]" )
     }
 }
 
-TEST_CASE( "graph widgets with color", "[widget][graph][color]" )
+TEST_CASE( "graph_widgets_with_color", "[widget][graph][color]" )
 {
     SECTION( "graph widget with 4 colors and 10 states" ) {
         widget colornum = widget_test_color_graph_widget.obj();
@@ -399,7 +439,7 @@ TEST_CASE( "graph widgets with color", "[widget][graph][color]" )
     }
 }
 
-TEST_CASE( "widgets showing avatar stats with color for normal value", "[widget][stats][color]" )
+TEST_CASE( "widgets_showing_avatar_stats_with_color_for_normal_value", "[widget][stats][color]" )
 {
     widget str_w = widget_test_str_color_num.obj();
     widget dex_w = widget_test_dex_color_num.obj();
@@ -447,24 +487,24 @@ TEST_CASE( "widgets showing avatar stats with color for normal value", "[widget]
     }
 }
 
-TEST_CASE( "widget showing character fatigue status", "[widget]" )
+TEST_CASE( "widget_showing_character_sleepiness_status", "[widget]" )
 {
-    widget fatigue_w = widget_test_fatigue_clause.obj();
+    widget sleepiness_w = widget_test_sleepiness_clause.obj();
 
     avatar &ava = get_avatar();
     clear_avatar();
 
-    ava.set_fatigue( 0 );
-    CHECK( fatigue_w.layout( ava ) == "Rest: " );
-    ava.set_fatigue( 192 );
-    CHECK( fatigue_w.layout( ava ) == "Rest: <color_c_yellow>Tired</color>" );
-    ava.set_fatigue( 384 );
-    CHECK( fatigue_w.layout( ava ) == "Rest: <color_c_light_red>Dead Tired</color>" );
-    ava.set_fatigue( 576 );
-    CHECK( fatigue_w.layout( ava ) == "Rest: <color_c_red>Exhausted</color>" );
+    ava.set_sleepiness( 0 );
+    CHECK( sleepiness_w.layout( ava ) == "Rest: " );
+    ava.set_sleepiness( 192 );
+    CHECK( sleepiness_w.layout( ava ) == "Rest: <color_c_yellow>Tired</color>" );
+    ava.set_sleepiness( 384 );
+    CHECK( sleepiness_w.layout( ava ) == "Rest: <color_c_light_red>Dead Tired</color>" );
+    ava.set_sleepiness( 576 );
+    CHECK( sleepiness_w.layout( ava ) == "Rest: <color_c_red>Exhausted</color>" );
 }
 
-TEST_CASE( "widgets showing avatar health with color for normal value", "[widget][health][color]" )
+TEST_CASE( "widgets_showing_avatar_health_with_color_for_normal_value", "[widget][health][color]" )
 {
     widget health_w = widget_test_health_color_num.obj();
     widget health_clause_w = widget_test_health_clause.obj();
@@ -495,7 +535,7 @@ TEST_CASE( "widgets showing avatar health with color for normal value", "[widget
     CHECK( health_clause_w.layout( ava ) == "Health: <color_c_light_green>Excellent</color>" );
 }
 
-TEST_CASE( "widgets showing body temperature and delta", "[widget]" )
+TEST_CASE( "widgets_showing_body_temperature_and_delta", "[widget]" )
 {
     widget w_temp = widget_test_body_temp_clause.obj();
     widget w_dtxt = widget_test_body_temp_delta_text.obj();
@@ -504,50 +544,50 @@ TEST_CASE( "widgets showing body temperature and delta", "[widget]" )
     avatar &ava = get_avatar();
     clear_avatar();
 
-    ava.set_all_parts_temp_cur( 499 );
-    ava.set_all_parts_temp_conv( 5000 );
+    ava.set_all_parts_temp_cur( 27.99_C );
+    ava.set_all_parts_temp_conv( 37_C );
     CHECK( w_temp.layout( ava ) == "Heat: <color_c_blue>Freezing!</color>" );
     CHECK( w_dtxt.layout( ava ) == "Temp change: <color_c_red>(Rising!!)</color>" );
     CHECK( w_dsym.layout( ava ) == "Temp change: <color_c_red>↑↑↑</color>" );
 
-    ava.set_all_parts_temp_cur( 1999 );
-    ava.set_all_parts_temp_conv( 5000 );
+    ava.set_all_parts_temp_cur( 30.99_C );
+    ava.set_all_parts_temp_conv( 37_C );
     CHECK( w_temp.layout( ava ) == "Heat: <color_c_cyan>Very cold!</color>" );
     CHECK( w_dtxt.layout( ava ) == "Temp change: <color_c_light_red>(Rising!)</color>" );
     CHECK( w_dsym.layout( ava ) == "Temp change: <color_c_light_red>↑↑</color>" );
 
-    ava.set_all_parts_temp_cur( 3499 );
-    ava.set_all_parts_temp_conv( 5000 );
+    ava.set_all_parts_temp_cur( 33.99_C );
+    ava.set_all_parts_temp_conv( 37_C );
     CHECK( w_temp.layout( ava ) == "Heat: <color_c_light_blue>Chilly</color>" );
     CHECK( w_dtxt.layout( ava ) == "Temp change: <color_c_yellow>(Rising)</color>" );
     CHECK( w_dsym.layout( ava ) == "Temp change: <color_c_yellow>↑</color>" );
 
-    ava.set_all_parts_temp_cur( 5000 );
-    ava.set_all_parts_temp_conv( 5000 );
+    ava.set_all_parts_temp_cur( 37_C );
+    ava.set_all_parts_temp_conv( 37_C );
     CHECK( w_temp.layout( ava ) == "Heat: <color_c_green>Comfortable</color>" );
     CHECK( w_dtxt.layout( ava ) == "Temp change: " );
     CHECK( w_dsym.layout( ava ) == "Temp change: <color_c_green>-</color>" );
 
-    ava.set_all_parts_temp_cur( 6501 );
-    ava.set_all_parts_temp_conv( 5000 );
+    ava.set_all_parts_temp_cur( 40.01_C );
+    ava.set_all_parts_temp_conv( 37_C );
     CHECK( w_temp.layout( ava ) == "Heat: <color_c_yellow>warm</color>" );
     CHECK( w_dtxt.layout( ava ) == "Temp change: <color_c_light_blue>(Falling)</color>" );
     CHECK( w_dsym.layout( ava ) == "Temp change: <color_c_light_blue>↓</color>" );
 
-    ava.set_all_parts_temp_cur( 8001 );
-    ava.set_all_parts_temp_conv( 5000 );
+    ava.set_all_parts_temp_cur( 43.01_C );
+    ava.set_all_parts_temp_conv( 37_C );
     CHECK( w_temp.layout( ava ) == "Heat: <color_c_light_red>Very hot!</color>" );
     CHECK( w_dtxt.layout( ava ) == "Temp change: <color_c_cyan>(Falling!)</color>" );
     CHECK( w_dsym.layout( ava ) == "Temp change: <color_c_cyan>↓↓</color>" );
 
-    ava.set_all_parts_temp_cur( 9501 );
-    ava.set_all_parts_temp_conv( 5000 );
+    ava.set_all_parts_temp_cur( 46.01_C );
+    ava.set_all_parts_temp_conv( 37_C );
     CHECK( w_temp.layout( ava ) == "Heat: <color_c_red>Scorching!</color>" );
     CHECK( w_dtxt.layout( ava ) == "Temp change: <color_c_blue>(Falling!!)</color>" );
     CHECK( w_dsym.layout( ava ) == "Temp change: <color_c_blue>↓↓↓</color>" );
 }
 
-TEST_CASE( "widgets showing avatar stamina", "[widget][avatar][stamina]" )
+TEST_CASE( "widgets_showing_avatar_stamina", "[widget][avatar][stamina]" )
 {
     avatar &ava = get_avatar();
     clear_avatar();
@@ -598,7 +638,7 @@ static void set_avatar_bmi( avatar &ava, float bmi )
     ava.set_stored_kcal( ava.get_healthy_kcal() * ( bmi / 5 ) );
 }
 
-TEST_CASE( "widgets showing avatar weight", "[widget][weight]" )
+TEST_CASE( "widgets_showing_avatar_weight", "[widget][weight]" )
 {
     avatar &ava = get_avatar();
     clear_avatar();
@@ -660,7 +700,7 @@ TEST_CASE( "widgets showing avatar weight", "[widget][weight]" )
 
 }
 
-TEST_CASE( "widgets showing avatar attributes", "[widget][avatar]" )
+TEST_CASE( "widgets_showing_avatar_attributes", "[widget][avatar]" )
 {
     avatar &ava = get_avatar();
     clear_avatar();
@@ -697,11 +737,11 @@ TEST_CASE( "widgets showing avatar attributes", "[widget][avatar]" )
 
         ava.clear_morale();
         CHECK( morale_w.layout( ava ) == "MORALE: 0" );
-        ava.add_morale( MORALE_FOOD_GOOD, 20 );
+        ava.add_morale( morale_food_good, 20 );
         CHECK( morale_w.layout( ava ) == "MORALE: 20" );
 
         ava.clear_morale();
-        ava.add_morale( MORALE_KILLED_INNOCENT, -100 );
+        ava.add_morale( morale_killed_innocent, -100 );
         CHECK( morale_w.layout( ava ) == "MORALE: -100" );
     }
 
@@ -709,15 +749,15 @@ TEST_CASE( "widgets showing avatar attributes", "[widget][avatar]" )
         bodypart_id head( "head" );
         widget head_num_w = widget_test_hp_head_num.obj();
         widget head_graph_w = widget_test_hp_head_graph.obj();
-        REQUIRE( ava.get_part_hp_max( head ) == 84 );
-        REQUIRE( ava.get_part_hp_cur( head ) == 84 );
+        REQUIRE( ava.get_part_hp_max( head ) == 85 );
+        REQUIRE( ava.get_part_hp_cur( head ) == 85 );
 
         ava.set_part_hp_cur( head, 84 );
         CHECK( head_num_w.layout( ava ) == "HEAD: 84" );
-        CHECK( head_graph_w.layout( ava ) == "HEAD: |||||" );
+        CHECK( head_graph_w.layout( ava ) == "HEAD: ||||\\" );
         ava.set_part_hp_cur( head, 42 );
         CHECK( head_num_w.layout( ava ) == "HEAD: 42" );
-        CHECK( head_graph_w.layout( ava ) == "HEAD: ||\\,," );
+        CHECK( head_graph_w.layout( ava ) == "HEAD: ||,,," );
         ava.set_part_hp_cur( head, 17 );
         CHECK( head_num_w.layout( ava ) == "HEAD: 17" );
         CHECK( head_graph_w.layout( ava ) == "HEAD: |,,,," );
@@ -746,7 +786,7 @@ TEST_CASE( "widgets showing avatar attributes", "[widget][avatar]" )
     }
 }
 
-TEST_CASE( "widgets showing activity level", "[widget][activity]" )
+TEST_CASE( "widgets_showing_activity_level", "[widget][activity]" )
 {
     avatar &ava = get_avatar();
     clear_avatar();
@@ -781,7 +821,7 @@ TEST_CASE( "widgets showing activity level", "[widget][activity]" )
     CHECK( activity_w.layout( ava ) == "Activity: <color_c_red>Extreme</color>" );
 }
 
-TEST_CASE( "widgets showing move counter and mode", "[widget][move_mode]" )
+TEST_CASE( "widgets_showing_move_counter_and_mode", "[widget][move_mode]" )
 {
     avatar &ava = get_avatar();
     clear_avatar();
@@ -828,7 +868,7 @@ TEST_CASE( "widgets showing move counter and mode", "[widget][move_mode]" )
     }
 }
 
-TEST_CASE( "thirst and hunger widgets", "[widget]" )
+TEST_CASE( "thirst_and_hunger_widgets", "[widget]" )
 {
     widget wt = widget_test_thirst_clause.obj();
     widget wh = widget_test_hunger_clause.obj();
@@ -890,7 +930,7 @@ TEST_CASE( "thirst and hunger widgets", "[widget]" )
     CHECK( wh.layout( ava ) == "HUNGER: <color_c_red>Engorged</color>" );
 }
 
-TEST_CASE( "widgets showing movement cost", "[widget][move_cost]" )
+TEST_CASE( "widgets_showing_movement_cost", "[widget][move_cost]" )
 {
     widget cost_num_w = widget_test_move_cost_num.obj();
 
@@ -905,28 +945,28 @@ TEST_CASE( "widgets showing movement cost", "[widget][move_cost]" )
     }
     SECTION( "wearing sneakers" ) {
         // Sneakers eliminate the no-shoes penalty
-        ava.wear_item( item( "sneakers" ) );
+        ava.wear_item( item( itype_sneakers ) );
         REQUIRE( ava.is_wearing_shoes() );
         REQUIRE( ava.run_cost( 100 ) == 100 );
         CHECK( cost_num_w.layout( ava ) == "MOVE COST: 100" );
     }
     SECTION( "wearing swim fins" ) {
         // Swim fins multiply cost by 1.5
-        ava.wear_item( item( "swim_fins" ) );
+        ava.wear_item( item( itype_swim_fins ) );
         REQUIRE( ava.is_wearing_shoes() );
         REQUIRE( ava.run_cost( 100 ) == 167 );
         CHECK( cost_num_w.layout( ava ) == "MOVE COST: 167" );
     }
 }
 
-TEST_CASE( "widgets showing Sun and Moon position", "[widget]" )
+TEST_CASE( "widgets_showing_Sun_and_Moon_position", "[widget]" )
 {
     widget sundial_w = widget_test_sundial_text.obj();
 
     avatar &ava = get_avatar();
     clear_map();
     clear_avatar();
-    const tripoint_abs_ms orig_pos = ava.get_location();
+    const tripoint_abs_ms orig_pos = ava.pos_abs();
 
     // 00:00
     time_point tp( calendar::turn_zero );
@@ -952,12 +992,12 @@ TEST_CASE( "widgets showing Sun and Moon position", "[widget]" )
            "<color_c_white> </color><color_c_white> </color><color_c_white> </color>"
            "<color_c_white> </color><color_c_white> </color><color_c_white> </color>"
            "<color_c_white> </color>]" );
-    ava.set_location( { 0, 0, -1 } );
+    ava.set_pos_abs_only( { 0, 0, -1 } );
     CHECK( sundial_w.layout( ava ) ==
            R"(SUN: [??????????????????])" );
 
     // 02:00
-    ava.set_location( orig_pos );
+    ava.set_pos_abs_only( orig_pos );
     tp += 2_hours;
     set_time( tp );
     sundial_w._width = 9;
@@ -981,12 +1021,12 @@ TEST_CASE( "widgets showing Sun and Moon position", "[widget]" )
            "<color_c_white> </color><color_c_light_blue>c</color><color_c_white> </color>"
            "<color_c_white> </color><color_c_white> </color><color_c_white> </color>"
            "<color_c_white> </color>]" );
-    ava.set_location( { 0, 0, -1 } );
+    ava.set_pos_abs_only( { 0, 0, -1 } );
     CHECK( sundial_w.layout( ava ) ==
            R"(SUN: [??????????????????])" );
 
     // 04:00
-    ava.set_location( orig_pos );
+    ava.set_pos_abs_only( orig_pos );
     tp += 2_hours;
     set_time( tp );
     sundial_w._width = 9;
@@ -1010,12 +1050,12 @@ TEST_CASE( "widgets showing Sun and Moon position", "[widget]" )
            "<color_c_white> </color><color_c_white> </color><color_c_white> </color>"
            "<color_c_white> </color><color_c_blue>,</color><color_c_white> </color>"
            "<color_c_white> </color>]" );
-    ava.set_location( { 0, 0, -1 } );
+    ava.set_pos_abs_only( { 0, 0, -1 } );
     CHECK( sundial_w.layout( ava ) ==
            R"(SUN: [??????????????????])" );
 
     // 06:00
-    ava.set_location( orig_pos );
+    ava.set_pos_abs_only( orig_pos );
     tp += 2_hours;
     set_time( tp );
     sundial_w._width = 9;
@@ -1039,12 +1079,12 @@ TEST_CASE( "widgets showing Sun and Moon position", "[widget]" )
            "<color_c_white> </color><color_c_white> </color><color_c_white> </color>"
            "<color_c_white> </color><color_c_white> </color><color_c_white> </color>"
            "<color_c_white> </color>]" );
-    ava.set_location( { 0, 0, -1 } );
+    ava.set_pos_abs_only( { 0, 0, -1 } );
     CHECK( sundial_w.layout( ava ) ==
            R"(SUN: [??????????????????])" );
 
     // 08:00
-    ava.set_location( orig_pos );
+    ava.set_pos_abs_only( orig_pos );
     tp += 2_hours;
     set_time( tp );
     sundial_w._width = 9;
@@ -1068,12 +1108,12 @@ TEST_CASE( "widgets showing Sun and Moon position", "[widget]" )
            "<color_c_white> </color><color_c_white> </color><color_c_white> </color>"
            "<color_c_white> </color><color_c_white> </color><color_c_white> </color>"
            "<color_c_white> </color>]" );
-    ava.set_location( { 0, 0, -1 } );
+    ava.set_pos_abs_only( { 0, 0, -1 } );
     CHECK( sundial_w.layout( ava ) ==
            R"(SUN: [??????????????????])" );
 
     // 10:00
-    ava.set_location( orig_pos );
+    ava.set_pos_abs_only( orig_pos );
     tp += 2_hours;
     set_time( tp );
     sundial_w._width = 9;
@@ -1097,12 +1137,12 @@ TEST_CASE( "widgets showing Sun and Moon position", "[widget]" )
            "<color_h_white> </color><color_h_white> </color><color_c_white> </color>"
            "<color_c_white> </color><color_c_white> </color><color_c_white> </color>"
            "<color_c_white> </color>]" );
-    ava.set_location( { 0, 0, -1 } );
+    ava.set_pos_abs_only( { 0, 0, -1 } );
     CHECK( sundial_w.layout( ava ) ==
            R"(SUN: [??????????????????])" );
 
     // 12:00
-    ava.set_location( orig_pos );
+    ava.set_pos_abs_only( orig_pos );
     tp += 2_hours;
     set_time( tp );
     sundial_w._width = 9;
@@ -1126,12 +1166,12 @@ TEST_CASE( "widgets showing Sun and Moon position", "[widget]" )
            "<color_h_white> </color><color_h_white> </color><color_h_white> </color>"
            "<color_h_white> </color><color_h_white> </color><color_h_white> </color>"
            "<color_h_white> </color>]" );
-    ava.set_location( { 0, 0, -1 } );
+    ava.set_pos_abs_only( { 0, 0, -1 } );
     CHECK( sundial_w.layout( ava ) ==
            R"(SUN: [??????????????????])" );
 
     // 14:00
-    ava.set_location( orig_pos );
+    ava.set_pos_abs_only( orig_pos );
     tp += 2_hours;
     set_time( tp );
     sundial_w._width = 9;
@@ -1155,12 +1195,12 @@ TEST_CASE( "widgets showing Sun and Moon position", "[widget]" )
            "<color_h_white> </color><color_h_yellow>+</color><color_h_white> </color>"
            "<color_h_white> </color><color_h_white> </color><color_h_white> </color>"
            "<color_h_white> </color>]" );
-    ava.set_location( { 0, 0, -1 } );
+    ava.set_pos_abs_only( { 0, 0, -1 } );
     CHECK( sundial_w.layout( ava ) ==
            R"(SUN: [??????????????????])" );
 
     // 16:00
-    ava.set_location( orig_pos );
+    ava.set_pos_abs_only( orig_pos );
     tp += 2_hours;
     set_time( tp );
     sundial_w._width = 9;
@@ -1184,12 +1224,12 @@ TEST_CASE( "widgets showing Sun and Moon position", "[widget]" )
            "<color_h_white> </color><color_h_white> </color><color_h_white> </color>"
            "<color_h_white> </color><color_h_brown>.</color><color_h_white> </color>"
            "<color_h_white> </color>]" );
-    ava.set_location( { 0, 0, -1 } );
+    ava.set_pos_abs_only( { 0, 0, -1 } );
     CHECK( sundial_w.layout( ava ) ==
            R"(SUN: [??????????????????])" );
 
     // 18:00
-    ava.set_location( orig_pos );
+    ava.set_pos_abs_only( orig_pos );
     tp += 2_hours;
     set_time( tp );
     sundial_w._width = 9;
@@ -1213,12 +1253,12 @@ TEST_CASE( "widgets showing Sun and Moon position", "[widget]" )
            "<color_c_white> </color><color_h_white> </color><color_h_white> </color>"
            "<color_h_white> </color><color_h_white> </color><color_h_white> </color>"
            "<color_h_white> </color>]" );
-    ava.set_location( { 0, 0, -1 } );
+    ava.set_pos_abs_only( { 0, 0, -1 } );
     CHECK( sundial_w.layout( ava ) ==
            R"(SUN: [??????????????????])" );
 
     // 20:00
-    ava.set_location( orig_pos );
+    ava.set_pos_abs_only( orig_pos );
     tp += 2_hours;
     set_time( tp );
     sundial_w._width = 9;
@@ -1242,12 +1282,12 @@ TEST_CASE( "widgets showing Sun and Moon position", "[widget]" )
            "<color_c_white> </color><color_c_white> </color><color_c_white> </color>"
            "<color_c_white> </color><color_c_white> </color><color_c_white> </color>"
            "<color_c_white> </color>]" );
-    ava.set_location( { 0, 0, -1 } );
+    ava.set_pos_abs_only( { 0, 0, -1 } );
     CHECK( sundial_w.layout( ava ) ==
            R"(SUN: [??????????????????])" );
 
     // 22:00
-    ava.set_location( orig_pos );
+    ava.set_pos_abs_only( orig_pos );
     tp += 2_hours;
     set_time( tp );
     sundial_w._width = 9;
@@ -1271,12 +1311,12 @@ TEST_CASE( "widgets showing Sun and Moon position", "[widget]" )
            "<color_c_white> </color><color_c_white> </color><color_c_white> </color>"
            "<color_c_white> </color><color_c_white> </color><color_c_white> </color>"
            "<color_c_white> </color>]" );
-    ava.set_location( { 0, 0, -1 } );
+    ava.set_pos_abs_only( { 0, 0, -1 } );
     CHECK( sundial_w.layout( ava ) ==
            R"(SUN: [??????????????????])" );
 
     // 00:00
-    ava.set_location( orig_pos );
+    ava.set_pos_abs_only( orig_pos );
     tp += 2_hours;
     set_time( tp );
     sundial_w._width = 9;
@@ -1300,7 +1340,7 @@ TEST_CASE( "widgets showing Sun and Moon position", "[widget]" )
            "<color_c_white> </color><color_c_white> </color><color_c_white> </color>"
            "<color_c_white> </color><color_c_white> </color><color_c_white> </color>"
            "<color_c_white> </color>]" );
-    ava.set_location( { 0, 0, -1 } );
+    ava.set_pos_abs_only( { 0, 0, -1 } );
     CHECK( sundial_w.layout( ava ) ==
            R"(SUN: [??????????????????])" );
 }
@@ -1316,7 +1356,7 @@ static void check_bp_has_status( const std::string_view layout,
     }
 }
 
-TEST_CASE( "widget showing body part status text", "[widget][bp_status]" )
+TEST_CASE( "widget_showing_body_part_status_text", "[widget][bp_status]" )
 {
     avatar &ava = get_avatar();
     clear_avatar();
@@ -1369,7 +1409,7 @@ TEST_CASE( "widget showing body part status text", "[widget][bp_status]" )
 
     WHEN( "broken and splinted" ) {
         ava.set_part_hp_cur( arm, 0 );
-        ava.wear_item( item( "arm_splint" ) );
+        ava.wear_item( item( itype_arm_splint ) );
         REQUIRE( ava.is_limb_broken( arm ) );
         REQUIRE( ava.worn_with_flag( json_flag_SPLINT, arm ) );
         check_bp_has_status( arm_status_w.layout( ava ),
@@ -1423,7 +1463,7 @@ TEST_CASE( "widget showing body part status text", "[widget][bp_status]" )
     }
 }
 
-TEST_CASE( "compact bodypart status widgets + legend", "[widget][bp_status]" )
+TEST_CASE( "compact_bodypart_status_widgets_+_legend", "[widget][bp_status]" )
 {
     const int sidebar_width = 36;
     avatar &ava = get_avatar();
@@ -1494,7 +1534,7 @@ TEST_CASE( "compact bodypart status widgets + legend", "[widget][bp_status]" )
 
     WHEN( "broken and splinted" ) {
         ava.set_part_hp_cur( arm, 0 );
-        ava.wear_item( item( "arm_splint" ) );
+        ava.wear_item( item( itype_arm_splint ) );
         REQUIRE( ava.is_limb_broken( arm ) );
         REQUIRE( ava.worn_with_flag( json_flag_SPLINT, arm ) );
         check_bp_has_status( arm_stat.layout( ava, sidebar_width ),
@@ -1564,7 +1604,7 @@ TEST_CASE( "compact bodypart status widgets + legend", "[widget][bp_status]" )
     }
 }
 
-TEST_CASE( "outer armor widget", "[widget][armor]" )
+TEST_CASE( "outer_armor_widget", "[widget][armor]" )
 {
     widget torso_armor_w = widget_test_torso_armor_outer_text.obj();
 
@@ -1575,22 +1615,22 @@ TEST_CASE( "outer armor widget", "[widget][armor]" )
     CHECK( torso_armor_w.layout( ava ) == "Torso Armor: -" );
 
     // Wearing something covering torso
-    ava.worn.wear_item( ava, item( "test_zentai" ), false, false );
+    ava.worn.wear_item( ava, item( itype_test_zentai ), false, false );
     CHECK( torso_armor_w.layout( ava ) ==
            "Torso Armor: <color_c_green>++</color>\u00A0test zentai (poor fit)" );
 
     // Wearing socks doesn't affect the torso
-    ava.worn.wear_item( ava, item( "test_socks" ), false, false );
+    ava.worn.wear_item( ava, item( itype_test_socks ), false, false );
     CHECK( torso_armor_w.layout( ava ) ==
            "Torso Armor: <color_c_green>++</color>\u00A0test zentai (poor fit)" );
 
     // Wearing something else on the torso
-    ava.worn.wear_item( ava, item( "test_hazmat_suit" ), false, false );
+    ava.worn.wear_item( ava, item( itype_test_hazmat_suit ), false, false );
     CHECK( torso_armor_w.layout( ava ) ==
            "Torso Armor: <color_c_green>++</color>\u00A0TEST hazmat suit (poor fit)" );
 }
 
-TEST_CASE( "radiation badge widget", "[widget][radiation]" )
+TEST_CASE( "radiation_badge_widget", "[widget][radiation]" )
 {
     widget rads_w = widget_test_rad_badge_text.obj();
 
@@ -1623,7 +1663,7 @@ TEST_CASE( "radiation badge widget", "[widget][radiation]" )
     CHECK( rads_w.layout( ava ) == "RADIATION: <color_c_pink> black </color>" );
 }
 
-TEST_CASE( "moon and lighting widgets", "[widget]" )
+TEST_CASE( "moon_and_lighting_widgets", "[widget]" )
 {
     // The CI tests have inconsistent lighting values for the same
     // time/day/weather/sun azimuth/etc, so just validate extreme lighting
@@ -1658,8 +1698,10 @@ TEST_CASE( "moon and lighting widgets", "[widget]" )
     CHECK( w_light.layout( ava ) == "LIGHTING: <color_c_yellow>bright</color>" );
 }
 
-TEST_CASE( "compass widget", "[widget][compass]" )
+TEST_CASE( "compass_widget", "[widget][compass]" )
 {
+    const map &here = get_map();
+
     const int sidebar_width = 36;
     widget c5s_N = widget_test_compass_N.obj();
     widget c5s_N_nowidth = widget_test_compass_N_nowidth.obj();
@@ -1671,8 +1713,8 @@ TEST_CASE( "compass widget", "[widget][compass]" )
     avatar &ava = get_avatar();
     clear_avatar();
 
-    const tripoint northeast = ava.pos() + tripoint( 10, -10, 0 );
-    const tripoint north = ava.pos() + tripoint( 0, -15, 0 );
+    const tripoint_bub_ms northeast = ava.pos_bub() + tripoint( 10, -10, 0 );
+    const tripoint_bub_ms north = ava.pos_bub() + tripoint( 0, -15, 0 );
 
     SECTION( "No monsters" ) {
         clear_map();
@@ -1694,7 +1736,7 @@ TEST_CASE( "compass widget", "[widget][compass]" )
         set_time( calendar::turn_zero + 12_hours );
         monster &mon1 = spawn_test_monster( "mon_test_CBM", northeast );
         g->mon_info_update();
-        REQUIRE( ava.sees( mon1 ) );
+        REQUIRE( ava.sees( here, mon1 ) );
         REQUIRE( ava.get_mon_visible().unique_mons[static_cast<int>( cardinal_direction::NORTHEAST )].size()
                  == 1 );
         CHECK( c5s_N.layout( ava, sidebar_width ) ==
@@ -1716,7 +1758,7 @@ TEST_CASE( "compass widget", "[widget][compass]" )
         set_time( calendar::turn_zero + 12_hours );
         monster &mon1 = spawn_test_monster( "mon_test_CBM", north );
         g->mon_info_update();
-        REQUIRE( ava.sees( mon1 ) );
+        REQUIRE( ava.sees( here,  mon1 ) );
         REQUIRE( ava.get_mon_visible().unique_mons[static_cast<int>( cardinal_direction::NORTH )].size() ==
                  1 );
         CHECK( c5s_N.layout( ava, sidebar_width ) ==
@@ -1741,9 +1783,9 @@ TEST_CASE( "compass widget", "[widget][compass]" )
         monster &mon2 = spawn_test_monster( "mon_test_CBM", north + tripoint( 0, -1, 0 ) );
         monster &mon3 = spawn_test_monster( "mon_test_CBM", north + tripoint( 0, -2, 0 ) );
         g->mon_info_update();
-        REQUIRE( ava.sees( mon1 ) );
-        REQUIRE( ava.sees( mon2 ) );
-        REQUIRE( ava.sees( mon3 ) );
+        REQUIRE( ava.sees( here, mon1 ) );
+        REQUIRE( ava.sees( here, mon2 ) );
+        REQUIRE( ava.sees( here,  mon3 ) );
         REQUIRE( ava.get_mon_visible().unique_mons[static_cast<int>( cardinal_direction::NORTH )].size() ==
                  1 );
         CHECK( c5s_N.layout( ava, sidebar_width ) ==
@@ -1768,9 +1810,9 @@ TEST_CASE( "compass widget", "[widget][compass]" )
         monster &mon2 = spawn_test_monster( "mon_test_bovine", north + tripoint( 0, -1, 0 ) );
         monster &mon3 = spawn_test_monster( "mon_test_shearable", north + tripoint( 0, -2, 0 ) );
         g->mon_info_update();
-        REQUIRE( ava.sees( mon1 ) );
-        REQUIRE( ava.sees( mon2 ) );
-        REQUIRE( ava.sees( mon3 ) );
+        REQUIRE( ava.sees( here, mon1 ) );
+        REQUIRE( ava.sees( here,  mon2 ) );
+        REQUIRE( ava.sees( here,  mon3 ) );
         REQUIRE( ava.get_mon_visible().unique_mons[static_cast<int>( cardinal_direction::NORTH )].size() ==
                  3 );
         CHECK( c5s_N.layout( ava, sidebar_width ) ==
@@ -1813,7 +1855,7 @@ TEST_CASE( "compass widget", "[widget][compass]" )
 // This test case calls layout() at different widths for 2-, 3-, and 4-column layouts,
 // to verify and demonstrate how the space is distributed among widgets in columns.
 //
-TEST_CASE( "layout widgets in columns", "[widget][layout][columns]" )
+TEST_CASE( "layout_widgets_in_columns", "[widget][layout][columns]" )
 {
     widget stat_w = widget_test_stat_panel.obj();
     widget two_w = widget_test_2_column_layout.obj();
@@ -1902,8 +1944,9 @@ TEST_CASE( "layout widgets in columns", "[widget][layout][columns]" )
     CHECK( four_w.layout( ava, 60 ) == "MOVE: 50        SPEED: 100      FOCUS: 120     MANA: 1000   " );
 }
 
-TEST_CASE( "widgets showing weather conditions", "[widget][weather]" )
+TEST_CASE( "widgets_showing_weather_conditions", "[widget][weather]" )
 {
+    map &here = get_map();
     widget weather_w = widget_test_weather_text.obj();
 
     avatar &ava = get_avatar();
@@ -1937,7 +1980,7 @@ TEST_CASE( "widgets showing weather conditions", "[widget][weather]" )
         }
 
         SECTION( "cannot see weather when underground" ) {
-            ava.setpos( tripoint_below );
+            ava.setpos( here, tripoint_bub_ms::zero + tripoint::below );
             CHECK( weather_w.layout( ava ) == "Weather: <color_c_light_gray>Underground</color>" );
         }
     }
@@ -1946,23 +1989,23 @@ TEST_CASE( "widgets showing weather conditions", "[widget][weather]" )
 // Fill a 3x3 overmap area around the avatar with a given overmap terrain
 static void fill_overmap_area( const avatar &ava, const oter_id &oter )
 {
-    const tripoint_abs_omt &ava_pos = ava.global_omt_location();
+    const tripoint_abs_omt &ava_pos = ava.pos_abs_omt();
     for( int x = -1; x <= 1; ++x ) {
         for( int y = -1; y <= 1; ++y ) {
             const tripoint offset( x, y, 0 );
             overmap_buffer.ter_set( ava_pos + offset, oter );
-            overmap_buffer.set_seen( ava_pos + offset, true );
+            overmap_buffer.set_seen( ava_pos + offset, om_vision_level::full );
         }
     }
 }
 
-TEST_CASE( "multi-line overmap text widget", "[widget][overmap]" )
+TEST_CASE( "multi-line_overmap_text_widget", "[widget][overmap]" )
 {
     widget overmap_w = widget_test_overmap_3x3_text.obj();
     avatar &ava = get_avatar();
     mission msn;
     // Use mission target to invalidate the om cache
-    msn.set_target( ava.global_omt_location() + tripoint( 5, 0, 0 ) );
+    msn.set_target( ava.pos_abs_omt() + tripoint( 5, 0, 0 ) );
     clear_avatar();
     clear_map();
     ava.on_mission_assignment( msn );
@@ -1975,7 +2018,7 @@ TEST_CASE( "multi-line overmap text widget", "[widget][overmap]" )
         const std::string h_brown_dot = "<color_h_brown>.</color>";
         fill_overmap_area( ava, oter_id( "field" ) );
         // Mission marker to the north of avatar position (y - 2)
-        msn.set_target( ava.global_omt_location() + tripoint( 0, -2, 0 ) );
+        msn.set_target( ava.pos_abs_omt() + tripoint( 0, -2, 0 ) );
         // (red star in top center of the map)
         const std::vector<std::string> field_3x3 = {
             brown_dot, red_star, brown_dot, "\n",
@@ -1990,7 +2033,7 @@ TEST_CASE( "multi-line overmap text widget", "[widget][overmap]" )
         const std::string h_green_F = "<color_h_green>F</color>";
         fill_overmap_area( ava, oter_id( "forest" ) );
         // Mission marker to the east of avatar position (x + 2)
-        msn.set_target( ava.global_omt_location() + tripoint( 2, 0, 0 ) );
+        msn.set_target( ava.pos_abs_omt() + tripoint( 2, 0, 0 ) );
         // (red star on the right edge of the map)
         const std::vector<std::string> forest_3x3 = {
             green_F, green_F, green_F, "\n",
@@ -2006,7 +2049,7 @@ TEST_CASE( "multi-line overmap text widget", "[widget][overmap]" )
         //const std::string blue_L_red = "<color_c_light_blue_red>L</color>";
         fill_overmap_area( ava, oter_id( "central_lab" ) );
         // Mission marker southwest of avatar position (x-2, y+2)
-        msn.set_target( ava.global_omt_location() + tripoint( -2, 2, 0 ) );
+        msn.set_target( ava.pos_abs_omt() + tripoint( -2, 2, 0 ) );
         // (red star on lower left corner of map)
         const std::vector<std::string> lab_3x3 = {
             blue_L, blue_L, blue_L, "\n",
@@ -2019,7 +2062,7 @@ TEST_CASE( "multi-line overmap text widget", "[widget][overmap]" )
     // TODO: Horde indicators
 }
 
-TEST_CASE( "Custom widget height and multiline formatting", "[widget]" )
+TEST_CASE( "Custom_widget_height_and_multiline_formatting", "[widget]" )
 {
     widget height1 = widget_test_weather_text.obj();
     widget height5 = widget_test_weather_text_height5.obj();
@@ -2037,17 +2080,17 @@ TEST_CASE( "Custom widget height and multiline formatting", "[widget]" )
         CHECK( layout5 == "Weather: <color_c_light_cyan>Sunny</color>" );
     }
 
-#if (defined(TILES) || defined(_WIN32))
+#if (defined(TILES))
     SECTION( "Multiline drawing splits newlines correctly" ) {
         const int cols = 32;
         const int rows = 5;
-        catacurses::window w = catacurses::newwin( rows, cols, point_zero );
+        catacurses::window w = catacurses::newwin( rows, cols, point::zero );
 
         werase( w );
         SECTION( "Single-line layout" ) {
             std::string layout1 = "abcd efgh ijkl mnop qrst";
             CHECK( widget::custom_draw_multiline( layout1, w, 1, 30, 0 ) == 1 );
-            std::vector<std::string> lines = scrape_win_at( w, point_zero, cols, rows );
+            std::vector<std::string> lines = scrape_win_at( w, point::zero, cols, rows );
             CHECK( lines[0] == " abcd efgh ijkl mnop qrst       " );
             CHECK( lines[1] == "                                " );
             CHECK( lines[2] == "                                " );
@@ -2059,7 +2102,7 @@ TEST_CASE( "Custom widget height and multiline formatting", "[widget]" )
         SECTION( "Single-line layout" ) {
             std::string layout5 = "abcd\nefgh\nijkl\nmnop\nqrst";
             CHECK( widget::custom_draw_multiline( layout5, w, 1, 30, 0 ) == 5 );
-            std::vector<std::string> lines = scrape_win_at( w, point_zero, cols, rows );
+            std::vector<std::string> lines = scrape_win_at( w, point::zero, cols, rows );
             CHECK( lines[0] == " abcd                           " );
             CHECK( lines[1] == " efgh                           " );
             CHECK( lines[2] == " ijkl                           " );
@@ -2081,15 +2124,16 @@ static int get_height_from_widget_factory( const widget_id &id )
 }
 
 // Use the compass legend as a proof-of-concept
-TEST_CASE( "Dynamic height for multiline widgets", "[widget]" )
+TEST_CASE( "Dynamic_height_for_multiline_widgets", "[widget]" )
 {
+    const map &here = get_map();
     const int sidebar_width = 36;
     widget c5s_legend3 = widget_test_compass_legend_3.obj();
 
     avatar &ava = get_avatar();
     clear_avatar();
 
-    const tripoint north = ava.pos() + tripoint( 0, -15, 0 );
+    const tripoint_bub_ms north = ava.pos_bub() + tripoint( 0, -15, 0 );
 
     SECTION( "No monsters (0 lines, bumped to 1 line when drawing)" ) {
         clear_map();
@@ -2104,7 +2148,7 @@ TEST_CASE( "Dynamic height for multiline widgets", "[widget]" )
         set_time( calendar::turn_zero + 12_hours );
         monster &mon1 = spawn_test_monster( "mon_test_CBM", north );
         g->mon_info_update();
-        REQUIRE( ava.sees( mon1 ) );
+        REQUIRE( ava.sees( here, mon1 ) );
         REQUIRE( ava.get_mon_visible().unique_mons[static_cast<int>( cardinal_direction::NORTH )].size() ==
                  1 );
         CHECK( c5s_legend3.layout( ava, sidebar_width ) ==
@@ -2119,8 +2163,8 @@ TEST_CASE( "Dynamic height for multiline widgets", "[widget]" )
         //NOLINTNEXTLINE(cata-use-named-point-constants)
         monster &mon2 = spawn_test_monster( "mon_test_bovine", north + tripoint( 0, -1, 0 ) );
         g->mon_info_update();
-        REQUIRE( ava.sees( mon1 ) );
-        REQUIRE( ava.sees( mon2 ) );
+        REQUIRE( ava.sees( here, mon1 ) );
+        REQUIRE( ava.sees( here, mon2 ) );
         REQUIRE( ava.get_mon_visible().unique_mons[static_cast<int>( cardinal_direction::NORTH )].size() ==
                  2 );
         CHECK( c5s_legend3.layout( ava, sidebar_width ) ==
@@ -2137,9 +2181,9 @@ TEST_CASE( "Dynamic height for multiline widgets", "[widget]" )
         monster &mon2 = spawn_test_monster( "mon_test_bovine", north + tripoint( 0, -1, 0 ) );
         monster &mon3 = spawn_test_monster( "mon_test_shearable", north + tripoint( 0, -2, 0 ) );
         g->mon_info_update();
-        REQUIRE( ava.sees( mon1 ) );
-        REQUIRE( ava.sees( mon2 ) );
-        REQUIRE( ava.sees( mon3 ) );
+        REQUIRE( ava.sees( here, mon1 ) );
+        REQUIRE( ava.sees( here, mon2 ) );
+        REQUIRE( ava.sees( here, mon3 ) );
         REQUIRE( ava.get_mon_visible().unique_mons[static_cast<int>( cardinal_direction::NORTH )].size() ==
                  3 );
         CHECK( c5s_legend3.layout( ava, sidebar_width ) ==
@@ -2217,7 +2261,7 @@ TEST_CASE( "Dynamic height for multiline widgets", "[widget]" )
  *           L ARM:          $
  *           TORSO:          B
  */
-TEST_CASE( "Widget alignment", "[widget]" )
+TEST_CASE( "Widget_alignment", "[widget]" )
 {
     const int sidebar_width = 36;
     const int row_label_width = 15;
@@ -2437,7 +2481,7 @@ TEST_CASE( "Widget alignment", "[widget]" )
         ava.add_effect( effect_bleed, 1_minutes, torso );
         ava.get_effect( effect_bleed, torso ).set_intensity( 5 );
         ava.set_part_hp_cur( arm, 0 );
-        ava.wear_item( item( "arm_splint" ) );
+        ava.wear_item( item( itype_arm_splint ) );
         ava.add_effect( effect_bandaged, 1_minutes, arm );
 
         bp_legend._label_align = widget_alignment::LEFT;
@@ -2514,7 +2558,7 @@ TEST_CASE( "Widget alignment", "[widget]" )
     }
 }
 
-TEST_CASE( "Clause conditions - pure JSON widgets", "[widget][clause][condition]" )
+TEST_CASE( "Clause_conditions_-_pure_JSON_widgets", "[widget][clause][condition]" )
 {
     const int sidebar_width = 20;
 
@@ -2592,9 +2636,9 @@ TEST_CASE( "Clause conditions - pure JSON widgets", "[widget][clause][condition]
     }
 }
 
-TEST_CASE( "widget disabled when empty", "[widget]" )
+TEST_CASE( "widget_disabled_when_empty", "[widget]" )
 {
-    item blindfold( "blindfold" );
+    item blindfold( itype_blindfold );
     avatar &ava = get_avatar();
     clear_avatar();
 
@@ -2615,19 +2659,19 @@ TEST_CASE( "widget disabled when empty", "[widget]" )
         CHECK( wgt.layout( ava ).empty() );
     }
 
-#if (defined(TILES) || defined(_WIN32))
+#if (defined(TILES))
     SECTION( "test widget rendering when disabled" ) {
         const int cols = 32;
         const int rows = 5;
 
-        catacurses::window w = catacurses::newwin( rows, cols, point_zero );
+        catacurses::window w = catacurses::newwin( rows, cols, point::zero );
 
         werase( w );
         SECTION( "Not empty" ) {
             // Show widget text when character is not blind
             REQUIRE( !ava.is_blind() );
             CHECK( widget::custom_draw_multiline( wgt.layout( ava ), w, 1, 30, 0 ) == 1 );
-            std::vector<std::string> lines = scrape_win_at( w, point_zero, cols, rows );
+            std::vector<std::string> lines = scrape_win_at( w, point::zero, cols, rows );
             CHECK( lines[0] == " NOT EMPTY: Text exists         " );
             CHECK( lines[1] == "                                " );
             CHECK( lines[2] == "                                " );
@@ -2642,7 +2686,7 @@ TEST_CASE( "widget disabled when empty", "[widget]" )
             REQUIRE( ava.is_blind() );
             // Shouldn't be called (height should be decremented), but check it just in case
             CHECK( widget::custom_draw_multiline( wgt.layout( ava ), w, 1, 30, 0 ) == 1 );
-            std::vector<std::string> lines = scrape_win_at( w, point_zero, cols, rows );
+            std::vector<std::string> lines = scrape_win_at( w, point::zero, cols, rows );
             CHECK( lines[0] == "                                " );
             CHECK( lines[1] == "                                " );
             CHECK( lines[2] == "                                " );
@@ -2653,7 +2697,7 @@ TEST_CASE( "widget disabled when empty", "[widget]" )
 #endif
 }
 
-TEST_CASE( "widget rows in columns", "[widget]" )
+TEST_CASE( "widget_rows_in_columns", "[widget]" )
 {
     avatar &ava = get_avatar();
     clear_avatar();
@@ -2815,7 +2859,7 @@ static void test_widget_flag_nopad( const bodypart_id &bid, int bleed_int, avata
     }
 }
 
-TEST_CASE( "W_NO_PADDING widget flag", "[widget]" )
+TEST_CASE( "W_NO_PADDING_widget_flag", "[widget]" )
 {
     avatar &ava = get_avatar();
     clear_avatar();
@@ -2825,7 +2869,12 @@ TEST_CASE( "W_NO_PADDING widget flag", "[widget]" )
     ava.movecounter = 0;
 
     // workaround for mbstowcs to process multibyte utf-8 chars
-    setlocale( LC_ALL, "" );
+    std::locale const &oldloc = std::locale();
+    on_out_of_scope reset_loc( [&oldloc]() {
+        std::locale::global( oldloc );
+    } );
+    char *result = setlocale( LC_ALL, "" );
+    REQUIRE( result );
 
     SECTION( "without flag" ) {
         const widget_id &wgt = widget_test_layout_nopad_noflag;
@@ -2898,6 +2947,47 @@ TEST_CASE( "W_NO_PADDING widget flag", "[widget]" )
             test_widget_flag_nopad( body_part_arm_l, 21, ava, wgt, true );
         }
     }
+}
 
-    setlocale( LC_ALL, "C" );
+TEST_CASE( "widgets_using_custom_vars", "[widget]" )
+{
+    avatar &ava = get_avatar();
+    clear_avatar();
+
+    SECTION( "static range" ) {
+        widget static_range_w = widget_test_custom_var_static_range.obj();
+
+        ava.set_focus( 75 );
+        CHECK( static_range_w.layout( ava ) == "FOCUS: 75" );
+        ava.set_focus( 120 );
+        CHECK( static_range_w.layout( ava ) == "FOCUS: 120" );
+    }
+
+    SECTION( "dynamic range" ) {
+        widget dynamic_range_w = widget_test_custom_var_dynamic_range.obj();
+        ava.str_max = 8;
+
+        GIVEN( "value within normal range" ) {
+            ava.set_str_bonus( 0 );
+            CHECK( dynamic_range_w.layout( ava ) == "STR: <color_c_white>8</color>" );
+        }
+
+        GIVEN( "value below normal range" ) {
+            ava.set_str_bonus( -1 );
+            CHECK( dynamic_range_w.layout( ava ) == "STR: <color_c_yellow>7</color>" );
+            ava.set_str_bonus( -2 );
+            CHECK( dynamic_range_w.layout( ava ) == "STR: <color_c_light_red>6</color>" );
+            ava.set_str_bonus( -3 );
+            CHECK( dynamic_range_w.layout( ava ) == "STR: <color_c_red>5</color>" );
+        }
+
+        GIVEN( "value above normal range" ) {
+            ava.set_str_bonus( 1 );
+            CHECK( dynamic_range_w.layout( ava ) == "STR: <color_c_light_cyan>9</color>" );
+            ava.set_str_bonus( 2 );
+            CHECK( dynamic_range_w.layout( ava ) == "STR: <color_c_light_green>10</color>" );
+            ava.set_str_bonus( 3 );
+            CHECK( dynamic_range_w.layout( ava ) == "STR: <color_c_green>11</color>" );
+        }
+    }
 }

@@ -1,7 +1,9 @@
+#include <cstdint>
 #include <cstdio>
-#include <iosfwd>
+#include <string>
 #include <vector>
 
+#include "activity_tracker.h"
 #include "avatar.h"
 #include "calendar.h"
 #include "cata_catch.h"
@@ -15,6 +17,13 @@
 
 static const efftype_id effect_tapeworm( "tapeworm" );
 
+static const itype_id itype_beansnrice( "beansnrice" );
+static const itype_id itype_debug_nutrition( "debug_nutrition" );
+static const itype_id itype_debug_orange( "debug_orange" );
+static const itype_id itype_debug_vitamins( "debug_vitamins" );
+static const itype_id itype_meat_cooked( "meat_cooked" );
+static const itype_id itype_veggy( "veggy" );
+
 static const trait_id trait_HUNGER3( "HUNGER3" );
 
 static const vitamin_id vitamin_calcium( "calcium" );
@@ -27,17 +36,23 @@ static void reset_time()
 {
     calendar::turn = calendar::start_of_cataclysm;
     Character &player_character = get_player_character();
-    player_character.set_stored_kcal( player_character.get_healthy_kcal() );
     player_character.set_hunger( 0 );
     clear_avatar();
 }
 
 static void pass_time( Character &p, time_duration amt )
 {
-    for( time_duration turns = 1_turns; turns < amt; turns += 1_turns ) {
-        calendar::turn += 1_turns;
-        p.update_body();
+    constexpr time_duration time_chunk = 1_minutes;
+
+    // make sure we start spinning aligned to minutes, so that calendar::once_every
+    // in Character::update_body works correctly, 997 is a randomly picked prime
+    REQUIRE( to_seconds<int64_t>( calendar::turn - calendar::turn_zero + 997 * time_chunk ) % 60 == 0 );
+
+    while( amt > 0_seconds ) {
+        p.update_body( calendar::turn, calendar::turn + time_chunk );
         p.update_health();
+        calendar::turn += time_chunk;
+        amt -= time_chunk;
     }
 }
 
@@ -68,7 +83,7 @@ static time_duration time_until_hungry( Character &p )
     unsigned int thirty_minutes = 0;
     do {
         p.set_sleep_deprivation( 0 );
-        p.set_fatigue( 0 );
+        p.set_sleepiness( 0 );
         pass_time( p, 30_minutes );
         thirty_minutes++;
     } while( p.get_hunger() < 40 ); // hungry
@@ -96,7 +111,7 @@ static void eat_all_nutrients( Character &you )
 {
     // Vitamin target: 100% DV -- or 96 vitamin "units" since all vitamins currently decay every 15m.
     // Energy target: 2100 kcal -- debug target will be completely sedentary.
-    item f( "debug_nutrition" );
+    item f( itype_debug_nutrition );
     you.consume( f );
 }
 
@@ -109,8 +124,7 @@ TEST_CASE( "starve_test", "[starve][slow]" )
     clear_stomach( dummy );
     dummy.reset_activity_level();
     dummy.set_stored_kcal( dummy.get_healthy_kcal() );
-    calendar::turn += 1_seconds;
-    dummy.update_body( calendar::turn, calendar::turn );
+    dummy.update_body( calendar::turn, calendar::turn + 1_seconds );
     dummy.set_activity_level( 1.0 );
 
     CAPTURE( dummy.metabolic_rate_base() );
@@ -121,6 +135,8 @@ TEST_CASE( "starve_test", "[starve][slow]" )
     CAPTURE( dummy.get_bmi() );
     CAPTURE( dummy.bodyweight() );
     CAPTURE( dummy.age() );
+    CAPTURE( dummy.base_bmr() );
+    CAPTURE( dummy.activity_history.average_activity() );
     CAPTURE( dummy.get_bmr() );
 
     // A specific BMR isn't the real target of this test, the number of days
@@ -135,7 +151,7 @@ TEST_CASE( "starve_test", "[starve][slow]" )
         results.push_back( string_format( "\nday %d: %d", day, dummy.get_stored_kcal() ) );
         pass_time( dummy, 1_days );
         dummy.set_thirst( 0 );
-        dummy.set_fatigue( 0 );
+        dummy.set_sleepiness( 0 );
         set_all_vitamins( 0, dummy );
         day++;
     } while( dummy.get_stored_kcal() > 0 && day < expected_day * 2 );
@@ -190,7 +206,7 @@ TEST_CASE( "vitamin_equilibrium", "[vitamins]" )
     REQUIRE( subject.vitamin_get( vitamin_vitC ) == -100 );
     REQUIRE( subject.vitamin_get( vitamin_calcium ) == -100 );
     REQUIRE( subject.vitamin_get( vitamin_iron ) == -100 );
-    item f( "debug_orange" );
+    item f( itype_debug_orange );
 
     // check that 100% of daily vit C is by default 96 units
     CHECK( subject.compute_effective_nutrients( f ).get_vitamin( vitamin_vitC ) == 96 );
@@ -220,7 +236,7 @@ TEST_CASE( "vitamin_multivitamin", "[vitamins]" )
     REQUIRE( subject.vitamin_get( vitamin_vitC ) == -100 );
     REQUIRE( subject.vitamin_get( vitamin_calcium ) == -100 );
     REQUIRE( subject.vitamin_get( vitamin_iron ) == -100 );
-    item f( "debug_vitamins" );
+    item f( itype_debug_vitamins );
 
     subject.consume( f );
 
@@ -256,7 +272,7 @@ TEST_CASE( "vitamin_daily", "[vitamins]" )
     REQUIRE( subject.get_daily_vitamin( vitamin_iron ) == 0 );
     REQUIRE( subject.get_health_tally() == 0 );
 
-    item f( "debug_vitamins" );
+    item f( itype_debug_vitamins );
 
     subject.consume( f );
 
@@ -310,7 +326,7 @@ TEST_CASE( "starve_test_hunger3", "[starve][slow]" )
         results.push_back( string_format( "\nday %d: %d", day, dummy.get_stored_kcal() ) );
         pass_time( dummy, 1_days );
         dummy.set_thirst( 0 );
-        dummy.set_fatigue( 0 );
+        dummy.set_sleepiness( 0 );
         set_all_vitamins( 0, dummy );
         day++;
     } while( dummy.get_stored_kcal() > 0 );
@@ -331,6 +347,7 @@ TEST_CASE( "all_nutrition_starve_test", "[starve][slow]" )
     const bool print_tests = false;
     avatar &dummy = get_avatar();
     reset_time();
+    dummy.set_stored_kcal( dummy.get_healthy_kcal() );
     clear_stomach( dummy );
     eat_all_nutrients( dummy );
     if( print_tests ) {
@@ -343,7 +360,7 @@ TEST_CASE( "all_nutrition_starve_test", "[starve][slow]" )
         }
         pass_time( dummy, 1_days );
         dummy.set_thirst( 0 );
-        dummy.set_fatigue( 0 );
+        dummy.set_sleepiness( 0 );
         eat_all_nutrients( dummy );
         print_stomach_contents( dummy, print_tests );
     }
@@ -406,9 +423,9 @@ TEST_CASE( "hunger" )
     }
     CHECK( hunger_time <= 270 );
     CHECK( hunger_time >= 240 );
-    item f( "meat_cooked" );
+    item f( itype_meat_cooked );
     dummy.consume( f );
-    f = item( "meat_cooked" );
+    f = item( itype_meat_cooked );
     dummy.consume( f );
     dummy.set_thirst( 0 );
     dummy.update_body();
@@ -421,9 +438,9 @@ TEST_CASE( "hunger" )
     }
     CHECK( hunger_time <= 240 );
     CHECK( hunger_time >= 210 );
-    f = item( "beansnrice" );
+    f = item( itype_beansnrice );
     dummy.consume( f );
-    f = item( "beansnrice" );
+    f = item( itype_beansnrice );
     dummy.consume( f );
     dummy.update_body();
     print_stomach_contents( dummy, print_tests );
@@ -438,7 +455,7 @@ TEST_CASE( "hunger" )
         printf( "eat 16 veggy\n" );
     }
     for( int i = 0; i < 16; i++ ) {
-        f = item( "veggy" );
+        f = item( itype_veggy );
         dummy.consume( f );
     }
     dummy.update_body();
@@ -457,7 +474,7 @@ TEST_CASE( "hunger" )
         dummy.mutate_towards( trait_HUNGER3 );
     }
     for( int i = 0; i < 16; i++ ) {
-        f = item( "veggy" );
+        f = item( itype_veggy );
         dummy.consume( f );
     }
     dummy.update_body();

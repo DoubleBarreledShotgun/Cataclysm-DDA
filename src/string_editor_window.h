@@ -2,19 +2,19 @@
 #ifndef CATA_SRC_STRING_EDITOR_WINDOW_H
 #define CATA_SRC_STRING_EDITOR_WINDOW_H
 
+#include <functional>
+#include <memory>
 #include <string>
-#include <vector>
+#include <utility>
 
+#include "catacharset.h"
 #include "cursesdef.h"
-#include "input.h"
-#include "output.h"
-#include "ui.h"
+#include "point.h"
 
 class folded_text;
-
-struct ime_preview_range;
-
+class input_context;
 class ui_adaptor;
+struct ime_preview_range;
 
 /// <summary>
 /// Editor, to let the player edit text.

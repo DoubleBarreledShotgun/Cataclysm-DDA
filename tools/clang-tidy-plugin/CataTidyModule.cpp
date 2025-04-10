@@ -1,11 +1,11 @@
 #include <clang/Basic/Version.h>
+#include <clang-tidy/ClangTidyModule.h>
+#include <clang-tidy/ClangTidyModuleRegistry.h>
 #include <llvm/ADT/StringRef.h>
 
 #include "AlmostNeverAutoCheck.h"
 #include "AssertCheck.h"
 #include "AvoidAlternativeTokensCheck.h"
-#include "ClangTidyModule.h"
-#include "ClangTidyModuleRegistry.h"
 #include "CombineLocalsIntoPointCheck.h"
 #include "DeterminismCheck.h"
 #include "HeaderGuardCheck.h"
@@ -29,6 +29,8 @@
 #include "TranslateStringLiteralCheck.h"
 #include "TranslationsInDebugMessagesCheck.h"
 #include "TranslatorCommentsCheck.h"
+#include "U8PathCheck.h"
+#include "UnitOverflowCheck.h"
 #include "UnsequencedCallsCheck.h"
 #include "UnusedStaticsCheck.h"
 #include "UseLocalizedSortingCheck.h"
@@ -41,7 +43,7 @@
 #include "XYCheck.h"
 
 #if defined( CATA_CLANG_TIDY_EXECUTABLE )
-#include "tool/ClangTidyMain.h"
+#include <clang-tidy/tool/ClangTidyMain.h>
 #endif
 
 namespace clang::tidy
@@ -57,10 +59,10 @@ class CataModule : public ClangTidyModule
             // the same version we linked against
 
             std::string RuntimeVersion = getClangFullVersion();
-            if( !StringRef( RuntimeVersion ).contains( "clang version " CLANG_VERSION_STRING ) ) {
+            if( !llvm::StringRef( RuntimeVersion ).contains( "clang version " CLANG_VERSION_STRING ) ) {
                 llvm::report_fatal_error(
-                    Twine( "clang version mismatch in CataTidyModule.  Compiled against "
-                           CLANG_VERSION_STRING " but loaded by ", RuntimeVersion ) );
+                    llvm::Twine( "clang version mismatch in CataTidyModule.  Compiled against "
+                                 CLANG_VERSION_STRING " but loaded by ", RuntimeVersion ) );
                 abort(); // NOLINT(cata-assert)
             }
             CheckFactories.registerCheck<AlmostNeverAutoCheck>( "cata-almost-never-auto" );
@@ -98,6 +100,8 @@ class CataModule : public ClangTidyModule
             CheckFactories.registerCheck<TranslationsInDebugMessagesCheck>(
                 "cata-translations-in-debug-messages" );
             CheckFactories.registerCheck<TranslatorCommentsCheck>( "cata-translator-comments" );
+            CheckFactories.registerCheck<U8PathCheck>( "cata-u8-path" );
+            CheckFactories.registerCheck<UnitOverflowCheck>( "cata-unit-overflow" );
             CheckFactories.registerCheck<UnsequencedCallsCheck>( "cata-unsequenced-calls" );
             CheckFactories.registerCheck<UnusedStaticsCheck>( "cata-unused-statics" );
             CheckFactories.registerCheck<UseLocalizedSortingCheck>( "cata-use-localized-sorting" );

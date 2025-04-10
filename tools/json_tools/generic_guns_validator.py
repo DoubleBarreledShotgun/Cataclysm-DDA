@@ -13,6 +13,8 @@ GG_DIR = os.path.normpath(os.path.join(
 AMMO_TYPE_WHITELIST = {
     '40x46mm',  # Grenade
     'atgm',  # Rocket
+    'atlatl',
+    'bolt_ballista',
     'barb',
     'battery',
     'BB',
@@ -23,10 +25,13 @@ AMMO_TYPE_WHITELIST = {
     'chemical_spray',
     'fishspear',
     'flammable',
+    'gene_sting',
+    'nether_huntsman_javelin_ammo',
     'm235',  # Rocket
     'metal_rail',
     'nail',
     'nuts_bolts',
+    'oxygen',
     'paintball',
     'pebble',
     'plasma',
@@ -50,10 +55,36 @@ ID_WHITELIST = {
     'l_bak_223',
     'pneumatic_shotgun',
     'rifle_223',
+    'ksg-25',
+    'raging_judge',
+    'american_180',
+    'gene_sting_gun',
+    'nether_huntsman_arm',
+    'ppsh',
+    'af2011a1_38super',
     # Magazines
+    'a180mag',
+    'a180mag1',
+    'a180mag2',
+    'a180mag3',
+    'a180mag4',
+    'af2011a1mag',
+    '454_speedloader6',
     '223_speedloader5',
     'coin_wrapper',
+    'exodiisapramag5',
+    'robofac_gun_40mm_3rd',
+    'robofac_gun_40mm_5rd',
+    'robofac_gun_40mm_10rd',
     'bio_shotgun_gun',
+    'gasfilter_med',
+    'gasfilter_sm',
+    'matchhead_30carbine',
+    'matchhead_30carbine_jsp',
+    "rebreather_cartridge",
+    "rebreather_cartridge_air",
+    "rebreather_cartridge_o2",
+    "rebreather_cartridge_regen"
 }
 
 
@@ -119,6 +150,15 @@ def items_for_which_all_ancestors(items, pred):
     return result
 
 
+def blacklisted_items(data):
+    blacklists = items_of_type(data, 'ITEM_BLACKLIST')
+    items = set()
+    for blacklist in blacklists:
+        if 'items' in blacklist:
+            items.update(set(blacklist['items']))
+    return items
+
+
 def main():
     core_data, core_errors = util.import_data()
     print('Importing Generic Guns data from %r' % GG_DIR)
@@ -129,6 +169,7 @@ def main():
         sys.exit(1)
 
     gg_migrations = get_ids(items_of_type(gg_data, 'MIGRATION'))
+    gg_blacklist = blacklisted_items(gg_data)
 
     core_guns = items_of_type(core_data, 'GUN')
 
@@ -185,7 +226,7 @@ def main():
     returncode = 0
 
     def check_missing(items, name):
-        ids = get_ids(items) - ID_WHITELIST
+        ids = get_ids(items) - ID_WHITELIST - gg_blacklist
 
         missing_migrations = ids - gg_migrations
         if missing_migrations:

@@ -3,22 +3,23 @@
 #define CATA_SRC_MATERIAL_H
 
 #include <cstddef>
-#include <iosfwd>
 #include <map>
-#include <new>
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "damage.h"
 #include "fire.h"
-#include "translations.h"
+#include "translation.h"
 #include "type_id.h"
+#include "units.h"
 
-class material_type;
 class JsonObject;
+class material_type;
+template <typename T> struct enum_traits;
 
 using mat_burn_products = std::vector<std::pair<itype_id, float>>;
 using material_list = std::vector<material_type>;
@@ -90,7 +91,6 @@ class material_type
         float _specific_heat_solid = 2.108f;
         float _latent_heat = 334.0f;
         float _freeze_point = 0; // Celsius
-        bool _edible = false;
         bool _rotting = false;
         bool _soft = false;
         bool _uncomfortable = false;
@@ -98,6 +98,9 @@ class material_type
 
         // the thickness that sheets of this material come in, anything that uses it should be a multiple of this
         float _sheet_thickness = 0.0f;
+
+        // the skill needed to repair this type of material
+        int _repair_difficulty = 10;
 
         translation _bash_dmg_verb;
         translation _cut_dmg_verb;
@@ -117,7 +120,6 @@ class material_type
 
         void load( const JsonObject &jsobj, std::string_view src );
         static void finalize_all();
-        void finalize();
         void check() const;
 
         material_id ident() const;
@@ -132,10 +134,13 @@ class material_type
         std::optional<itype_id> salvaged_into() const;
         itype_id repaired_with() const;
         float resist( const damage_type_id &dmg_type ) const;
+        // whether this material has an explicitly defined resistance for the specified damage type
+        bool has_dedicated_resist( const damage_type_id &dmg_type ) const;
         std::string bash_dmg_verb() const;
         std::string cut_dmg_verb() const;
-        std::string dmg_adj( int damage ) const;
+        std::string dmg_adj( int damage_level ) const;
         int chip_resist() const;
+        int repair_difficulty() const;
         float specific_heat_liquid() const;
         float specific_heat_solid() const;
         float latent_heat() const;
@@ -151,7 +156,6 @@ class material_type
         static int breathability_to_rating( breathability_rating breathability );
         int breathability() const;
         std::optional<int> wind_resist() const;
-        bool edible() const;
         bool rotting() const;
         bool soft() const;
         bool uncomfortable() const;

@@ -1,23 +1,32 @@
 #include "npctrade.h"
 
 #include <algorithm>
-#include <iosfwd>
+#include <cmath>
+#include <cstdlib>
+#include <functional>
 #include <iterator>
 #include <list>
+#include <memory>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <vector>
 
 #include "avatar.h"
 #include "character.h"
+#include "character_attire.h"
 #include "debug.h"
+#include "enums.h"
 #include "faction.h"
 #include "item.h"
 #include "item_category.h" // IWYU pragma: keep
+#include "item_contents.h"
 #include "item_location.h"
 #include "item_pocket.h"
 #include "npc.h"
+#include "npc_opinion.h"
 #include "npctrade_utils.h"
+#include "pocket_type.h"
 #include "ret_val.h"
 #include "skill.h"
 #include "trade_ui.h"
@@ -327,6 +336,7 @@ bool npc_trading::trade( npc &np, int cost, const std::string &deal )
 
         // NPCs will remember debts, to the limit that they'll extend credit or previous debts
         if( !np.will_exchange_items_freely() ) {
+            player_character.cash -= trade_result.delta_bank;
             update_npc_owed( np, trade_result.balance, trade_result.value_you );
             player_character.practice( skill_speech, trade_result.value_you / 10000 );
         }
@@ -352,12 +362,12 @@ bool npc_trading::npc_can_fit_items( npc const &np, trade_selector::select_t con
             const units::volume pvol = pkt.max_containable_volume();
             const item &i = *it.first;
             if( pkt.can_holster( i ) || ( pkt.can_contain( i ).success() && pvol > i.volume() ) ) {
-                pkt.put_in( i, item_pocket::pocket_type::CONTAINER );
+                pkt.put_in( i, pocket_type::CONTAINER );
                 item_stored = true;
                 break;
             }
         }
-        if( !item_stored && !np.can_wear( *it.first, false ).success() ) {
+        if( !item_stored ) {
             return false;
         }
     }
