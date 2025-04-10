@@ -1571,7 +1571,7 @@
         "covers": [ "leg_l", "leg_r", "arm_l", "arm_r" ],
         "specifically_covers": [ "arm_shoulder_r", "arm_shoulder_l", "leg_hip_l", "leg_hip_r" ],
         "coverage": 100,
-        "encumbrance": 10
+        "encumbrance": 2
       }
     ],
     "melee_damage": { "bash": 8 }
@@ -1688,7 +1688,7 @@
         "covers": [ "leg_l", "leg_r", "arm_l", "arm_r" ],
         "specifically_covers": [ "arm_shoulder_r", "arm_shoulder_l", "leg_hip_l", "leg_hip_r" ],
         "coverage": 100,
-        "encumbrance": 10
+        "encumbrance": 3
       }
     ],
     "melee_damage": { "bash": 8 }
@@ -1805,7 +1805,7 @@
         "covers": [ "leg_l", "leg_r", "arm_l", "arm_r" ],
         "specifically_covers": [ "arm_shoulder_r", "arm_shoulder_l", "leg_hip_l", "leg_hip_r" ],
         "coverage": 100,
-        "encumbrance": 10
+        "encumbrance": 4
       }
     ],
     "melee_damage": { "bash": 8 }
