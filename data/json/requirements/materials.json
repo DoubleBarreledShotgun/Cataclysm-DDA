@@ -456,7 +456,7 @@
     "id": "steel_tiny",
     "type": "requirement",
     "//": "Materials for use when forging atypically small items from steel",
-    "components": [ [ [ "steel_chunk_any", 1 ] ] ]
+    "components": [ [ [ "steel_chunk_any", 1, "LIST" ] ] ]
   },
   {
     "id": "lc_steel_tiny",
